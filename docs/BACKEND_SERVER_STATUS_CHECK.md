@@ -2,7 +2,7 @@
 
 ## 🔍 현재 상황
 
-프론트엔드에서 `localhost:3001`로 연결하려고 하는데, 실제 백엔드는 `localhost:5000`에서 실행되어야 합니다.
+프론트엔드에서 `localhost:3001`로 연결하려고 하는데, 실제 백엔드는 `localhost:5010`에서 실행되어야 합니다.
 
 ---
 
@@ -12,13 +12,13 @@
 
 **터미널에서 확인:**
 ```bash
-cd msv-server
+cd hvo-server
 npm run dev
 ```
 
 **예상 출력:**
 ```
-🚀 MVS Backend Server running on 0.0.0.0:5000
+🚀 Hyvision One Backend Server running on 0.0.0.0:5000
 📊 Health check: http://0.0.0.0:5000/health
 🌐 API base URL: http://0.0.0.0:5000/api
 ```
@@ -43,12 +43,12 @@ TCP    0.0.0.0:5000           0.0.0.0:0              LISTENING       12345
 
 **브라우저에서:**
 ```
-http://localhost:5000/health
+http://localhost:5010/health
 ```
 
 **또는 PowerShell:**
 ```powershell
-Invoke-WebRequest -Uri "http://localhost:5000/health" -UseBasicParsing
+Invoke-WebRequest -Uri "http://localhost:5010/health" -UseBasicParsing
 ```
 
 **예상 응답:**
@@ -92,7 +92,7 @@ Database connection error: ...
 
 **해결:**
 1. PostgreSQL이 실행 중인지 확인
-2. 데이터베이스 설정 확인 (`msv-server/env.development`)
+2. 데이터베이스 설정 확인 (`hvo-server/env.development`)
 3. 데이터베이스 연결 정보 확인
 
 ---
@@ -101,15 +101,15 @@ Database connection error: ...
 
 **확인:**
 ```powershell
-cd msv-server
+cd hvo-server
 Get-Content env.development
 ```
 
 **필수 환경 변수:**
-- `PORT=5000`
+- `PORT=5010`
 - `DB_HOST=localhost`
-- `DB_NAME=mvs`
-- `DB_USER=mvs_user`
+- `DB_NAME=hvo`
+- `DB_USER=hvo_user`
 - `DB_PASSWORD=Korean@2026`
 
 ---
@@ -119,7 +119,7 @@ Get-Content env.development
 ### 방법 1: 개발 모드로 시작
 
 ```bash
-cd msv-server
+cd hvo-server
 npm run dev
 ```
 
@@ -133,7 +133,7 @@ npm run dev
 ### 방법 2: 프로덕션 모드로 시작
 
 ```bash
-cd msv-server
+cd hvo-server
 npm run build
 npm start
 ```
@@ -158,12 +158,12 @@ npm start
 
 **파일 위치:**
 ```
-msv-server/server-log.txt
+hvo-server/server-log.txt
 ```
 
 **최근 로그 확인:**
 ```powershell
-Get-Content msv-server/server-log.txt -Tail 50
+Get-Content hvo-server/server-log.txt -Tail 50
 ```
 
 ---
@@ -178,7 +178,7 @@ Environment PORT: undefined
 Final PORT: 5000
 Host: 0.0.0.0
 🌐 HTTP server mode
-🚀 MVS Backend Server running on 0.0.0.0:5000
+🚀 Hyvision One Backend Server running on 0.0.0.0:5000
 ```
 
 **문제가 있는 경우:**

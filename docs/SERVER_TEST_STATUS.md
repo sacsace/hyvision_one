@@ -4,7 +4,7 @@
 
 ## 🚀 서버 시작
 
-### 백엔드 서버 (msv-server)
+### 백엔드 서버 (hvo-server)
 - **상태**: 백그라운드에서 실행 중
 - **포트**: 5000 (기본값)
 - **명령어**: `npm run dev`
@@ -13,10 +13,10 @@
 ### 서버 확인 방법
 ```bash
 # 서버 상태 확인
-curl http://localhost:5000/health
+curl http://localhost:5010/health
 
 # 또는 브라우저에서 접속
-http://localhost:5000/health
+http://localhost:5010/health
 ```
 
 ## 🧪 테스트 실행
@@ -49,13 +49,13 @@ npm run test:watch
 ## 📋 다음 단계
 
 1. **서버 상태 확인**
-   - 브라우저에서 `http://localhost:5000/health` 접속
-   - 또는 `curl http://localhost:5000/health` 실행
+   - 브라우저에서 `http://localhost:5010/health` 접속
+   - 또는 `curl http://localhost:5010/health` 실행
 
 2. **API 테스트**
-   - `http://localhost:5000/api/health` - API 헬스체크
-   - `http://localhost:5000/api/menus` - 메뉴 조회
-   - `http://localhost:5000/api/company` - 회사 정보 조회
+   - `http://localhost:5010/api/health` - API 헬스체크
+   - `http://localhost:5010/api/menus` - 메뉴 조회
+   - `http://localhost:5010/api/company` - 회사 정보 조회
 
 3. **데이터베이스 연결 확인**
    - 서버 로그에서 "Database connection successful" 메시지 확인

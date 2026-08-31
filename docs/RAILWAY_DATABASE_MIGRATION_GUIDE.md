@@ -48,12 +48,12 @@ railway login
 railway link
 
 # 백엔드 서비스에서 마이그레이션 실행
-railway run --service mvs-backend npm run db:migrate
+railway run --service hvo-backend npm run db:migrate
 ```
 
 ### 방법 2: Railway 대시보드 터미널 사용
 
-1. Railway 대시보드 → **mvs-backend** 서비스 선택
+1. Railway 대시보드 → **hvo-backend** 서비스 선택
 2. **Deployments** 탭 클릭
 3. 최신 배포의 **"..." 메뉴** → **"View Logs"** 또는 **"Open Shell"** 클릭
 4. 터미널에서 다음 명령 실행:
@@ -65,7 +65,7 @@ npm run db:migrate
 
 ### 방법 3: Railway 대시보드에서 직접 실행
 
-1. Railway 대시보드 → **mvs-backend** 서비스
+1. Railway 대시보드 → **hvo-backend** 서비스
 2. **Settings** → **Deploy** 섹션
 3. **"Run Command"** 또는 **"One-off Command"** 옵션 사용
 4. 명령어 입력: `npm run db:migrate`

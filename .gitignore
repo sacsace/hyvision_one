@@ -137,3 +137,7 @@ playwright/.cache/
 backup/
 msv-server/uploads/
 msv-frontend/.env.development
+# Runtime uploads (never commit user/binary uploads)
+hvo-server/uploads/
+msv-server/uploads/
+uploads/

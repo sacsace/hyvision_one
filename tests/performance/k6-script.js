@@ -1,4 +1,4 @@
-// MVS 성능 테스트 스크립트 (k6)
+// Hyvision One 성능 테스트 스크립트 (k6)
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -23,7 +23,7 @@ export const options = {
 };
 
 // 테스트 데이터
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:5000';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:5010';
 const TEST_USER = {
   userid: 'testuser',
   password: 'TestPassword123!'
@@ -33,7 +33,7 @@ const TEST_USER = {
 let authToken = null;
 
 export function setup() {
-  console.log('🚀 MVS 성능 테스트 시작');
+  console.log('🚀 Hyvision One 성능 테스트 시작');
   console.log(`대상 URL: ${BASE_URL}`);
   
   // 초기 인증

@@ -1,4 +1,4 @@
-# MVS 서버 중지 스크립트
+# Hyvision One 서버 중지 스크립트
 # 실행 중인 서버 프로세스를 안전하게 종료
 
 param(
@@ -19,7 +19,7 @@ function Write-ColorOutput {
 
 # 도움말 표시
 if ($Help) {
-    Write-ColorOutput "`nMVS 서버 중지 스크립트 사용법" "Cyan"
+    Write-ColorOutput "`nHyvision One 서버 중지 스크립트 사용법" "Cyan"
     Write-ColorOutput ("=" * 60) "Gray"
     Write-ColorOutput "`n사용법:" "Yellow"
     Write-ColorOutput "  .\server\stop-server.ps1            # 모든 서버 중지"
@@ -30,7 +30,7 @@ if ($Help) {
     exit 0
 }
 
-Write-ColorOutput "`n🛑 MVS 서버 중지 스크립트" "Cyan"
+Write-ColorOutput "`n🛑 Hyvision One 서버 중지 스크립트" "Cyan"
 Write-ColorOutput ("=" * 60) "Gray"
 
 # 포트에서 프로세스 종료 함수
@@ -96,12 +96,12 @@ try {
         $stopped = $true
     } else {
         if ($BackendOnly) {
-            $stopped = Stop-ProcessOnPort -Port 5000 -ServerName "Backend"
+            $stopped = Stop-ProcessOnPort -Port 5030 -ServerName "Backend"
         } elseif ($FrontendOnly) {
-            $stopped = Stop-ProcessOnPort -Port 3000 -ServerName "Frontend"
+            $stopped = Stop-ProcessOnPort -Port 3030 -ServerName "Frontend"
         } else {
-            $backendStopped = Stop-ProcessOnPort -Port 5000 -ServerName "Backend"
-            $frontendStopped = Stop-ProcessOnPort -Port 3000 -ServerName "Frontend"
+            $backendStopped = Stop-ProcessOnPort -Port 5030 -ServerName "Backend"
+            $frontendStopped = Stop-ProcessOnPort -Port 3030 -ServerName "Frontend"
             $stopped = $backendStopped -or $frontendStopped
         }
     }

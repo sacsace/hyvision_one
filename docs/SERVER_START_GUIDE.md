@@ -1,8 +1,8 @@
-# MVS 서버 시작 가이드
+# Hyvision One 서버 시작 가이드
 
 ## 📋 개요
 
-MVS 프로젝트의 서버를 쉽게 시작하고 관리할 수 있는 스크립트입니다.
+Hyvision One 프로젝트의 서버를 쉽게 시작하고 관리할 수 있는 스크립트입니다.
 
 ## 🚀 빠른 시작
 
@@ -71,22 +71,22 @@ server\start-server.bat
 
 ### 백엔드 서버
 ```bash
-cd msv-server
+cd hvo-server
 npm run dev
 ```
 
 ### 프론트엔드 서버
 ```bash
-cd msv-frontend
+cd hvo-frontend
 npm start
 ```
 
 ## 📊 서버 정보
 
 ### 포트
-- **프론트엔드**: http://localhost:3000
-- **백엔드 API**: http://localhost:5000
-- **헬스체크**: http://localhost:5000/health
+- **프론트엔드**: http://localhost:3010
+- **백엔드 API**: http://localhost:5010
+- **헬스체크**: http://localhost:5010/health
 
 ### 테스트 계정
 - **ID**: root / admin / user1
@@ -114,21 +114,21 @@ netstat -ano | findstr :3000
 ### 환경 변수 파일이 없는 경우
 ```bash
 # 백엔드 환경 변수 파일 복사
-copy msv-server\env.example msv-server\.env
+copy hvo-server\env.example hvo-server\.env
 
 # 프론트엔드 환경 변수 파일 복사 (필요한 경우)
-copy msv-frontend\env.example msv-frontend\.env
+copy hvo-frontend\env.example hvo-frontend\.env
 ```
 
 ### 의존성이 설치되지 않은 경우
 스크립트가 자동으로 설치를 시도합니다. 수동으로 설치하려면:
 ```bash
 # 백엔드 의존성 설치
-cd msv-server
+cd hvo-server
 npm install
 
 # 프론트엔드 의존성 설치
-cd msv-frontend
+cd hvo-frontend
 npm install
 ```
 
@@ -203,10 +203,10 @@ Railway Postgres에는 **파일 업로드 UI가 없습니다.** 로컬 PC에서 
 
 ### 2. 복원 실행 (저장소 루트 `MVS/` 기준)
 
-**기본 경로** `backup/mvs_db.dump` (pg_dump 커스텀 포맷 `-Fc`) 를 Railway DB에 넣습니다.
+**기본 경로** `backup/hvo_db.dump` (pg_dump 커스텀 포맷 `-Fc`) 를 Railway DB에 넣습니다.
 
 ```powershell
-cd msv-server
+cd hvo-server
 $env:DATABASE_URL = "postgresql://...."   # Railway에서 복사한 값 전체
 npm run db:restore:railway
 ```
@@ -214,13 +214,13 @@ npm run db:restore:railway
 다른 덤프 파일을 지정:
 
 ```powershell
-npm run db:restore:railway -- ..\backup\mvs_db.dump
+npm run db:restore:railway -- ..\backup\hvo_db.dump
 ```
 
 **기존 스키마·데이터를 비우고** 덤프 내용으로 맞추려면 (운영 DB에서는 신중히):
 
 ```powershell
-npm run db:restore:railway -- ..\backup\mvs_db.dump --clean
+npm run db:restore:railway -- ..\backup\hvo_db.dump --clean
 ```
 
 **평문 `.sql` 파일**이면 스크립트가 자동으로 `psql -f`를 사용합니다.

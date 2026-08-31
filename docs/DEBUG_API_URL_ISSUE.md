@@ -2,8 +2,8 @@
 
 ## 🔍 현재 상황
 
-- ✅ 프론트엔드가 `http://localhost:3000`에서 정상 실행 중
-- ✅ `.env.development` 파일 존재하고 `REACT_APP_API_URL=http://localhost:5000/api` 설정됨
+- ✅ 프론트엔드가 `http://localhost:3010`에서 정상 실행 중
+- ✅ `.env.development` 파일 존재하고 `REACT_APP_API_URL=http://localhost:5010/api` 설정됨
 - ❌ 브라우저에서 여전히 `localhost:3001`로 연결 시도
 
 ---
@@ -50,15 +50,15 @@
 
 ```javascript
 === API Configuration ===
-API Base URL: http://localhost:5000/api  // ✅ 정상
+API Base URL: http://localhost:5010/api  // ✅ 정상
 또는
 API Base URL: http://localhost:3001/api  // ❌ 문제
 
-REACT_APP_API_URL: http://localhost:5000/api  // ✅ 정상
+REACT_APP_API_URL: http://localhost:5010/api  // ✅ 정상
 또는
 REACT_APP_API_URL: (not set)  // ❌ 문제
 
-🔧 환경 변수에서 API URL 사용: http://localhost:5000/api  // ✅ 정상
+🔧 환경 변수에서 API URL 사용: http://localhost:5010/api  // ✅ 정상
 또는
 🌍 도메인 감지, API URL: http://localhost:3001/api  // ❌ 문제
 ```
@@ -72,7 +72,7 @@ REACT_APP_API_URL: (not set)  // ❌ 문제
 
 **2단계: 캐시 정리 (선택사항)**
 ```bash
-cd msv-frontend
+cd hvo-frontend
 # node_modules/.cache 삭제 (선택사항)
 Remove-Item -Recurse -Force node_modules/.cache -ErrorAction SilentlyContinue
 ```
@@ -88,21 +88,21 @@ npm start
 
 **확인:**
 ```powershell
-cd msv-frontend
+cd hvo-frontend
 Get-Content .env.development | Select-String "REACT_APP_API_URL"
 ```
 
 **예상 출력:**
 ```
-REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=http://localhost:5010/api
 ```
 
 **없다면:**
 ```powershell
 # .env.development 파일 생성
 @"
-REACT_APP_API_URL=http://localhost:5000/api
-REACT_APP_WS_URL=ws://localhost:5000
+REACT_APP_API_URL=http://localhost:5010/api
+REACT_APP_WS_URL=ws://localhost:5010
 "@ | Out-File -FilePath .env.development -Encoding utf8
 ```
 
@@ -132,7 +132,7 @@ console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
 1. 로그인 시도
 2. 실패한 요청 확인
 3. Request URL 확인:
-   - ✅ `http://localhost:5000/api/auth/login` (정상)
+   - ✅ `http://localhost:5010/api/auth/login` (정상)
    - ❌ `http://localhost:3001/api/auth/login` (문제)
 
 ---
@@ -142,13 +142,13 @@ console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
 **백엔드가 실행 중인지 확인:**
 ```bash
 # 다른 터미널에서
-cd msv-server
+cd hvo-server
 npm run dev
 ```
 
 **확인:**
-- 백엔드가 `http://localhost:5000`에서 실행 중인지
-- 터미널에 "Server is running on port 5000" 메시지가 있는지
+- 백엔드가 `http://localhost:5010`에서 실행 중인지
+- 터미널에 "Server is running on port 5010" 메시지가 있는지
 
 ---
 
@@ -171,15 +171,15 @@ npm run dev
 ### 정상적인 경우
 ```javascript
 === API Configuration ===
-API Base URL: http://localhost:5000/api
+API Base URL: http://localhost:5010/api
 Environment: development
-REACT_APP_API_URL: http://localhost:5000/api
-Window location: http://localhost:3000/login
+REACT_APP_API_URL: http://localhost:5010/api
+Window location: http://localhost:3010/login
 Hostname: localhost
 Port: 3000
 Protocol: http:
 ========================
-🔧 환경 변수에서 API URL 사용: http://localhost:5000/api
+🔧 환경 변수에서 API URL 사용: http://localhost:5010/api
 ```
 
 ### 문제가 있는 경우

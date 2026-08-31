@@ -1,4 +1,4 @@
--- MVS 테이블 생성 스크립트
+-- Hyvision One 테이블 생성 스크립트
 -- PostgreSQL 15+ 호환
 
 -- 확장 기능 활성화

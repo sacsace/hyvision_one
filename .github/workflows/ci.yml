@@ -26,32 +26,32 @@ jobs:
 
     # 백엔드 린트 및 테스트
     - name: Install backend dependencies
-      working-directory: ./msv-server
+      working-directory: ./hvo-server
       run: npm ci
 
     - name: Run backend linting
-      working-directory: ./msv-server
+      working-directory: ./hvo-server
       run: npm run lint
 
     - name: Run backend tests
-      working-directory: ./msv-server
+      working-directory: ./hvo-server
       run: npm test
 
     # 프론트엔드 린트 및 테스트
     - name: Install frontend dependencies
-      working-directory: ./msv-frontend
+      working-directory: ./hvo-frontend
       run: npm ci
 
     - name: Run frontend linting
-      working-directory: ./msv-frontend
+      working-directory: ./hvo-frontend
       run: npm run lint
 
     - name: Run frontend tests
-      working-directory: ./msv-frontend
+      working-directory: ./hvo-frontend
       run: npm test
 
     - name: Build frontend
-      working-directory: ./msv-frontend
+      working-directory: ./hvo-frontend
       run: npm run build
 
   # 빈 Postgres에 마이그레이션 적용 스모크 (배포 전 스키마 검증)
@@ -61,9 +61,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: mvs
-          POSTGRES_PASSWORD: mvs_test
-          POSTGRES_DB: mvs_migrate_smoke
+          POSTGRES_USER: hvo
+          POSTGRES_PASSWORD: hvo_test
+          POSTGRES_DB: hvo_migrate_smoke
         ports:
           - 5432:5432
         options: >-
@@ -80,16 +80,16 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: msv-server/package-lock.json
+        cache-dependency-path: hvo-server/package-lock.json
 
     - name: Install backend dependencies
-      working-directory: ./msv-server
+      working-directory: ./hvo-server
       run: npm ci
 
     - name: Run DB migrations (smoke)
-      working-directory: ./msv-server
+      working-directory: ./hvo-server
       env:
-        DATABASE_URL: postgresql://mvs:mvs_test@localhost:5432/mvs_migrate_smoke
+        DATABASE_URL: postgresql://hvo:hvo_test@localhost:5432/hvo_migrate_smoke
         NODE_ENV: test
       run: node scripts/run-migrations.cjs
 
@@ -241,5 +241,5 @@ jobs:
       if: steps.check-k8s-secrets.outputs.k8s-config-available == 'true'
       run: |
         # 운영 환경 헬스체크
-        curl -f https://api.mvs.local/health
-        curl -f https://mvs.local
+        curl -f https://api.hvo.local/health
+        curl -f https://hvo.local

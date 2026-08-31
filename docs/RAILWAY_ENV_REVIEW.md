@@ -1,12 +1,12 @@
 # Railway 환경 변수 설정 검토 결과
 
-## ✅ 백엔드 (mvs-backend) - 10개 변수
+## ✅ 백엔드 (hvo-backend) - 10개 변수
 
 ### 올바르게 설정된 변수들
-1. ✅ `CORS_ORIGIN`: `https://www.mvsystem.in` - 올바름
+1. ✅ `CORS_ORIGIN`: `https://www.hvoystem.in` - 올바름
 2. ✅ `DATABASE_URL`: Railway 자동 생성 - 올바름
 3. ✅ `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_PORT`: Railway 자동 생성 - 올바름
-4. ✅ `JWT_SECRET`: `mvs-super-secret-jwt-key-2025` - 설정됨 (기본값이 아니므로 좋음)
+4. ✅ `JWT_SECRET`: `hvo-super-secret-jwt-key-2025` - 설정됨 (기본값이 아니므로 좋음)
 5. ✅ `NODE_ENV`: `production` - 올바름
 6. ✅ `SESSION_SECRET`: `1595d1dd261b63dfc046d5a40d2ae38629b28855f0c1140c239345912098e655` - 올바름
 
@@ -16,16 +16,16 @@
    - 추가 권장: `HOST=0.0.0.0`
 
 ### 🔍 CORS 설정 확인
-- 현재: `CORS_ORIGIN=https://www.mvsystem.in`
+- 현재: `CORS_ORIGIN=https://www.hvoystem.in`
 - 프론트엔드 URL도 추가해야 할 수 있음
-- 프론트엔드가 `https://mvs-frontend.railway.app`인 경우:
+- 프론트엔드가 `https://hvo-frontend.railway.app`인 경우:
   ```
-  CORS_ORIGIN=https://www.mvsystem.in,https://mvs-frontend.railway.app
+  CORS_ORIGIN=https://www.hvoystem.in,https://hvo-frontend.railway.app
   ```
 
 ---
 
-## ❌ 프론트엔드 (mvs-frontend) - 4개 변수
+## ❌ 프론트엔드 (hvo-frontend) - 4개 변수
 
 ### 올바르게 설정된 변수들
 1. ✅ `CI`: `false` - 올바름
@@ -36,8 +36,8 @@
 
 **`REACT_APP_API_URL`이 잘못 설정되었습니다!**
 
-- ❌ 현재 설정: `https://mvs-frontend.railway.app/api`
-- ✅ 올바른 설정: `https://mvs-backend.railway.app/api` (또는 실제 백엔드 URL)
+- ❌ 현재 설정: `https://hvo-frontend.railway.app/api`
+- ✅ 올바른 설정: `https://hvo-backend.railway.app/api` (또는 실제 백엔드 URL)
 
 **문제점:**
 - 프론트엔드가 자신의 URL로 API를 호출하려고 함
@@ -45,16 +45,16 @@
 - 로그인, 데이터 조회 등 모든 기능이 작동하지 않음
 
 **해결 방법:**
-1. Railway 대시보드 → mvs-backend → Settings에서 백엔드 URL 확인
-2. 예: `https://mvs-backend-production.up.railway.app`
+1. Railway 대시보드 → hvo-backend → Settings에서 백엔드 URL 확인
+2. 예: `https://hvo-backend-production.up.railway.app`
 3. 프론트엔드 `REACT_APP_API_URL`을 다음으로 변경:
    ```
-   https://mvs-backend-production.up.railway.app/api
+   https://hvo-backend-production.up.railway.app/api
    ```
 
 **또는 Railway 변수 참조 사용 (권장):**
 ```
-REACT_APP_API_URL=${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
+REACT_APP_API_URL=${{hvo-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 ```
 
 ---
@@ -68,8 +68,8 @@ REACT_APP_API_URL=${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 
 ### ⚠️ 수정 필요
 1. **프론트엔드 REACT_APP_API_URL** (긴급)
-   - 현재: `https://mvs-frontend.railway.app/api` ❌
-   - 변경: `https://mvs-backend.railway.app/api` ✅
+   - 현재: `https://hvo-frontend.railway.app/api` ❌
+   - 변경: `https://hvo-backend.railway.app/api` ✅
 
 2. **백엔드 CORS_ORIGIN** (권장)
    - 프론트엔드 URL 추가 고려
@@ -88,7 +88,7 @@ REACT_APP_API_URL=${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 
 ### 🟡 권장 (곧 수정)
 2. **백엔드 CORS_ORIGIN에 프론트엔드 URL 추가**
-   - 여러 도메인 허용: `https://www.mvsystem.in,https://mvs-frontend.railway.app`
+   - 여러 도메인 허용: `https://www.hvoystem.in,https://hvo-frontend.railway.app`
 
 3. **백엔드 HOST 변수 추가**
    - `HOST=0.0.0.0`
@@ -99,35 +99,35 @@ REACT_APP_API_URL=${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 
 ### 1. 프론트엔드 REACT_APP_API_URL 수정
 
-Railway 대시보드 → mvs-frontend → Variables:
+Railway 대시보드 → hvo-frontend → Variables:
 
 1. 기존 `REACT_APP_API_URL` 변수 찾기
 2. "Edit" 클릭
 3. 값 변경:
    ```
-   https://mvs-backend-production.up.railway.app/api
+   https://hvo-backend-production.up.railway.app/api
    ```
    (실제 백엔드 URL로 변경)
 
 4. 또는 Railway 변수 참조 사용:
    ```
-   ${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
+   ${{hvo-backend.RAILWAY_PUBLIC_DOMAIN}}/api
    ```
 
 ### 2. 백엔드 CORS_ORIGIN 업데이트 (선택사항)
 
-Railway 대시보드 → mvs-backend → Variables:
+Railway 대시보드 → hvo-backend → Variables:
 
 1. `CORS_ORIGIN` 변수 찾기
 2. "Edit" 클릭
 3. 값 변경:
    ```
-   https://www.mvsystem.in,https://mvs-frontend.railway.app
+   https://www.hvoystem.in,https://hvo-frontend.railway.app
    ```
 
 ### 3. 백엔드 HOST 추가 (선택사항)
 
-Railway 대시보드 → mvs-backend → Variables:
+Railway 대시보드 → hvo-backend → Variables:
 
 1. "New Variable" 클릭
 2. Name: `HOST`

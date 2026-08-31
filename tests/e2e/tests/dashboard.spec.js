@@ -1,4 +1,4 @@
-// MVS E2E 테스트 - 대시보드 기능
+// Hyvision One E2E 테스트 - 대시보드 기능
 
 const { test, expect } = require('@playwright/test');
 

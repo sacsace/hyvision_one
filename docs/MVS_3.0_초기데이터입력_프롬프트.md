@@ -1,7 +1,7 @@
-# MVS 초기 데이터 입력 프롬프트
+# Hyvision One 초기 데이터 입력 프롬프트
 
 ## 개요
-MVS 시스템의 초기 데이터 입력을 위한 포괄적인 가이드입니다. 이 프롬프트는 개발자와 Cursor AI가 시스템 초기화 시 필요한 모든 데이터를 체계적으로 입력할 수 있도록 도와줍니다.
+Hyvision One 시스템의 초기 데이터 입력을 위한 포괄적인 가이드입니다. 이 프롬프트는 개발자와 Cursor AI가 시스템 초기화 시 필요한 모든 데이터를 체계적으로 입력할 수 있도록 도와줍니다.
 
 ## 초기 데이터 입력 순서
 
@@ -57,13 +57,13 @@ INSERT INTO company (
     settings
 ) VALUES (
     1, 
-    'MVS Company', 
+    'Hyvision One Company', 
     '123-45-67890', 
     '김대표', 
     '서울시 서초구 서초대로 456', 
     '02-1234-5678', 
-    'info@mvs.com', 
-    'https://mvs.com', 
+    'info@hvo.com', 
+    'https://hvo.com', 
     'IT/소프트웨어', 
     0, 
     'enterprise', 
@@ -236,7 +236,7 @@ INSERT INTO "user" (
     1,
     'root',
     'Root User',
-    'root@mvs.com',
+    'root@hvo.com',
     '$2b$10$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8K8K8K8', -- password: admin123
     'root',
     'IT',
@@ -273,7 +273,7 @@ INSERT INTO "user" (
     1,
     'admin',
     'Admin User',
-    'admin@mvs.com',
+    'admin@hvo.com',
     '$2b$10$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8K8K8K8', -- password: admin123
     'admin',
     'Management',
@@ -310,7 +310,7 @@ INSERT INTO "user" (
     1,
     'user1',
     'Test User',
-    'user@mvs.com',
+    'user@hvo.com',
     '$2b$10$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8K8K8K8', -- password: admin123
     'user',
     'Sales',
@@ -518,12 +518,12 @@ ANALYZE;
 
 ### PowerShell 스크립트
 ```powershell
-# MVS 초기 데이터 입력 스크립트
-Write-Host "🚀 MVS 초기 데이터 입력 시작..." -ForegroundColor Green
+# Hyvision One 초기 데이터 입력 스크립트
+Write-Host "🚀 Hyvision One 초기 데이터 입력 시작..." -ForegroundColor Green
 
 # PostgreSQL 연결 확인
 Write-Host "📊 PostgreSQL 연결 확인 중..." -ForegroundColor Yellow
-$connectionString = "postgresql://mvs_user:mvs_password@localhost:5432/mvs"
+$connectionString = "postgresql://hvo_user:hvo_password@localhost:5432/hvo"
 
 # 초기 데이터 입력
 Write-Host "🌱 초기 데이터 입력 중..." -ForegroundColor Yellow
@@ -564,7 +564,7 @@ psql $connectionString -f "scripts/insert-sample-data.sql"
 Write-Host "9️⃣ 성능 최적화 인덱스 생성..." -ForegroundColor Cyan
 psql $connectionString -f "scripts/create-performance-indexes.sql"
 
-Write-Host "✅ MVS 초기 데이터 입력 완료!" -ForegroundColor Green
+Write-Host "✅ Hyvision One 초기 데이터 입력 완료!" -ForegroundColor Green
 Write-Host "📋 생성된 데이터:" -ForegroundColor Yellow
 Write-Host "   - 테넌트: 1개" -ForegroundColor White
 Write-Host "   - 회사: 1개" -ForegroundColor White
@@ -584,11 +584,11 @@ Write-Host "   비밀번호: admin123" -ForegroundColor White
 
 ### Node.js 스크립트
 ```javascript
-// msv-server/scripts/init-sample-data.js
+// hvo-server/scripts/init-sample-data.js
 const { execSync } = require('child_process');
 const path = require('path');
 
-console.log('🚀 MVS 초기 데이터 입력 시작...\n');
+console.log('🚀 Hyvision One 초기 데이터 입력 시작...\n');
 
 try {
   // 데이터베이스 마이그레이션 실행
@@ -610,7 +610,7 @@ try {
   const { initializeSampleData } = require('../src/data/sampleData');
   await initializeSampleData();
 
-  console.log('\n🎉 MVS 초기 데이터 입력 완료!');
+  console.log('\n🎉 Hyvision One 초기 데이터 입력 완료!');
   console.log('\n📋 생성된 데이터:');
   console.log('   - 테넌트: 1개');
   console.log('   - 회사: 1개');
@@ -741,4 +741,4 @@ LIMIT 10;
 
 ---
 
-**이 프롬프트를 사용하여 MVS 시스템의 초기 데이터를 체계적으로 입력할 수 있습니다. 각 단계별로 순서대로 실행하면 안정적인 시스템 초기화가 가능합니다.**
+**이 프롬프트를 사용하여 Hyvision One 시스템의 초기 데이터를 체계적으로 입력할 수 있습니다. 각 단계별로 순서대로 실행하면 안정적인 시스템 초기화가 가능합니다.**

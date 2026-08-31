@@ -22,7 +22,7 @@
 - 빌드가 실패했을 수 있음
 
 **확인 방법:**
-- Railway 대시보드 → mvs-frontend → Deployments → 로그 확인
+- Railway 대시보드 → hvo-frontend → Deployments → 로그 확인
 - 빌드 단계에서 오류가 있는지 확인
 
 ### 3. 의존성 문제
@@ -37,7 +37,7 @@
 
 ### 방법 1: start:railway 스크립트 수정 (권장)
 
-`msv-frontend/package.json`:
+`hvo-frontend/package.json`:
 
 ```json
 {
@@ -59,7 +59,7 @@
 
 ### 방법 2: nixpacks.toml 수정
 
-`msv-frontend/nixpacks.toml`:
+`hvo-frontend/nixpacks.toml`:
 
 ```toml
 [start]
@@ -86,7 +86,7 @@ cmd = "PORT=${PORT:-3000} npx serve -s build -l ${PORT:-3000}"
 
 ### Railway 로그 확인
 
-1. Railway 대시보드 → mvs-frontend → Deployments
+1. Railway 대시보드 → hvo-frontend → Deployments
 2. 최신 배포의 로그 확인
 3. 다음 오류 메시지 확인:
    - `Error: listen EADDRINUSE` - 포트 충돌

@@ -1,4 +1,4 @@
-# MVS - 단순하고 파워풀한 개발환경 가이드
+# Hyvision One - 단순하고 파워풀한 개발환경 가이드
 
 ## 🎯 1인 개발자를 위한 최적화
 
@@ -29,8 +29,8 @@ MVS/
 ├── .env              # 모든 개발 설정 (하나로 통합!)
 ├── dev.ps1           # 원클릭 개발 서버 시작
 ├── package.json      # 간단한 명령어들
-├── msv-server/       # 백엔드
-└── msv-frontend/     # 프론트엔드
+├── hvo-server/       # 백엔드
+└── hvo-frontend/     # 프론트엔드
 ```
 
 **복잡한 설정 파일들은 제거되었습니다!**
@@ -59,18 +59,18 @@ MVS/
 
 ```bash
 # 서버
-PORT=5000
-CORS_ORIGIN=http://localhost:3000
+PORT=5010
+CORS_ORIGIN=http://localhost:3010
 
 # 데이터베이스
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=mvs
-DB_USER=mvs_user
-DB_PASSWORD=mvs_password
+DB_NAME=hvo
+DB_USER=hvo_user
+DB_PASSWORD=hvo_password
 
 # 보안 (개발용)
-JWT_SECRET=mvs-dev-secret-key-minimum-32-characters-long
+JWT_SECRET=hvo-dev-secret-key-minimum-32-characters-long
 ```
 
 ### 자동 핫 리로드
@@ -82,9 +82,9 @@ JWT_SECRET=mvs-dev-secret-key-minimum-32-characters-long
 
 ## 📝 접속 정보
 
-- **프론트엔드**: http://localhost:3000
-- **백엔드 API**: http://localhost:5000
-- **헬스체크**: http://localhost:5000/health
+- **프론트엔드**: http://localhost:3010
+- **백엔드 API**: http://localhost:5010
+- **헬스체크**: http://localhost:5010/health
 
 ### 테스트 계정
 
@@ -101,8 +101,8 @@ JWT_SECRET=mvs-dev-secret-key-minimum-32-characters-long
    ```
 
 2. **코드 작성**
-   - 백엔드: `msv-server/src/` 수정 → 자동 재시작
-   - 프론트엔드: `msv-frontend/src/` 수정 → 자동 새로고침
+   - 백엔드: `hvo-server/src/` 수정 → 자동 재시작
+   - 프론트엔드: `hvo-frontend/src/` 수정 → 자동 새로고침
 
 3. **테스트**
    ```powershell
@@ -148,7 +148,7 @@ npm run db:reset
 
 ## 📚 추가 정보
 
-- 백엔드 API 문서: http://localhost:5000/health
+- 백엔드 API 문서: http://localhost:5010/health
 - 프론트엔드: React 18 + TypeScript + Material-UI
 - 백엔드: Node.js 20 + Express + Sequelize
 

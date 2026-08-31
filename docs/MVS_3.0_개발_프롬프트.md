@@ -1,4 +1,4 @@
-# MVS 개발 프롬프트
+# Hyvision One 개발 프롬프트
 
 > **문서 갱신**: 2026-04-27 — 보안·Railway·환경 변수·UI 반영 사항 추가  
 > **권장 후속**: PostgreSQL SSL CA 검증 강화, Helmet CSP 점진 도입, DB RLS(민감 테이블) 검토
@@ -54,21 +54,21 @@ net start postgresql-x64-17
 net start redis
 
 # 2. 백엔드 서버 실행
-cd msv-server && npm run dev
+cd hvo-server && npm run dev
 
 # 3. 프론트엔드 서버 실행 (새 터미널)
-cd msv-frontend && npm start
+cd hvo-frontend && npm start
 ```
 
 ### 접속 URL
-- **프론트엔드**: http://localhost:3000
-- **백엔드 API**: http://localhost:5000
-- **API 문서**: http://localhost:5000/api/health
+- **프론트엔드**: http://localhost:3010
+- **백엔드 API**: http://localhost:5010
+- **API 문서**: http://localhost:5010/api/health
 
 ## 프로젝트 구조
 ```
 MVS/
-├── msv-server/          # 백엔드 API 서버
+├── hvo-server/          # 백엔드 API 서버
 │   ├── src/
 │   │   ├── controllers/ # API 컨트롤러
 │   │   ├── models/      # Sequelize 모델
@@ -77,7 +77,7 @@ MVS/
 │   │   ├── middleware/  # 미들웨어
 │   │   └── utils/       # 유틸리티
 │   └── src/__tests__/   # Jest 설정·백엔드 테스트
-├── msv-frontend/        # 프론트엔드 React 앱
+├── hvo-frontend/        # 프론트엔드 React 앱
 │   ├── src/
 │   │   ├── components/  # React 컴포넌트
 │   │   ├── pages/       # 페이지 컴포넌트
@@ -113,11 +113,11 @@ MVS/
 10. **버전 관리**: 의미있는 커밋 메시지 작성
 
 ### 로깅 및 불필요한 코드
-- **애플리케이션 소스**(`msv-frontend/src`, `msv-server/src`)에는 디버깅용 `console.log` / `console.info` / `console.debug`를 남기지 않는다. (일회성 CLI·`scripts/` 유지보수 스크립트는 예외)
+- **애플리케이션 소스**(`hvo-frontend/src`, `hvo-server/src`)에는 디버깅용 `console.log` / `console.info` / `console.debug`를 남기지 않는다. (일회성 CLI·`scripts/` 유지보수 스크립트는 예외)
 - **민감 정보**(JWT·비밀번호·전체 요청 본문 등)는 콘솔·로그에 출력하지 않는다.
 - **실패·경고**는 `console.error` / `console.warn` 또는 프로젝트 표준 로거로만 남긴다. 서버 기동 한 줄 요약·DB 연결 성공 등 운영에 필요한 최소 메시지는 허용한다.
 - **빈 `useEffect`**, 주석만 남은 디버그 블록, 사용하지 않는 import는 제거한다.
-- 로컬 실행 중 생성되는 **`msv-server/server-log.txt`** 등 산출 로그 파일은 저장소에 포함하지 않는다(`.gitignore` 참고).
+- 로컬 실행 중 생성되는 **`hvo-server/server-log.txt`** 등 산출 로그 파일은 저장소에 포함하지 않는다(`.gitignore` 참고).
 
 ## 메뉴 구성 시스템
 
@@ -419,7 +419,7 @@ CREATE INDEX idx_parent_id ON menus(parent_id);
 
 #### 1. 파일 구조 이해
 ```
-msv-server/src/
+hvo-server/src/
 ├── controllers/     # API 엔드포인트 로직
 ├── models/         # Sequelize 데이터베이스 모델
 ├── routes/         # Express 라우터 정의
@@ -427,7 +427,7 @@ msv-server/src/
 ├── middleware/     # 인증, 권한, 로깅 미들웨어
 └── utils/          # 유틸리티 함수
 
-msv-frontend/src/
+hvo-frontend/src/
 ├── components/     # 재사용 가능한 React 컴포넌트
 ├── pages/          # 페이지 컴포넌트
 ├── hooks/          # 커스텀 React 훅
@@ -439,7 +439,7 @@ msv-frontend/src/
 
 #### 2. 데이터베이스 모델 작성 예시
 ```typescript
-// msv-server/src/models/User.ts
+// hvo-server/src/models/User.ts
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../config/database';
 
@@ -557,7 +557,7 @@ export default User;
 
 #### 3. 컨트롤러 작성 예시
 ```typescript
-// msv-server/src/controllers/userController.ts
+// hvo-server/src/controllers/userController.ts
 import { Request, Response } from 'express';
 import { User, Company } from '../models';
 import { Op } from 'sequelize';
@@ -665,7 +665,7 @@ export const createUser = async (req: Request, res: Response) => {
 
 #### 4. 프론트엔드 컴포넌트 작성 예시
 ```typescript
-// msv-frontend/src/components/UserList.tsx
+// hvo-frontend/src/components/UserList.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Table,
@@ -853,7 +853,7 @@ export default UserList;
 
 #### 5. API 라우트 작성 예시
 ```typescript
-// msv-server/src/routes/userRoutes.ts
+// hvo-server/src/routes/userRoutes.ts
 import express from 'express';
 import { getUsers, createUser, updateUser, deleteUser } from '../controllers/userController';
 import { authenticateToken } from '../middleware/auth';
@@ -933,8 +933,8 @@ chore: 빌드 설정 변경
 
 ### 개발 환경
 1. PostgreSQL과 Redis 서비스 시작
-2. 백엔드 서버 실행: `cd msv-server && npm run dev`
-3. 프론트엔드 서버 실행: `cd msv-frontend && npm start`
+2. 백엔드 서버 실행: `cd hvo-server && npm run dev`
+3. 프론트엔드 서버 실행: `cd hvo-frontend && npm start`
 4. 기능 개발 및 테스트
 
 ### 프로덕션 배포
@@ -964,8 +964,8 @@ chore: 빌드 설정 변경
 ## 보안 가이드라인
 
 ### 시크릿·환경 변수 (코드에 금지)
-- **`JWT_SECRET`**: 반드시 환경 변수로 설정. **32자 이상**이어야 서버가 기동된다(`msv-server/src/config/env.ts`의 `validateEnv`).
-- **`SESSION_SECRET`**, DB 비밀번호, 외부 API 키 등: **소스에 기본값·샘플 시크릿을 넣지 않는다.** (과거 `mvs-jwt-secret` 같은 하드코딩 금지)
+- **`JWT_SECRET`**: 반드시 환경 변수로 설정. **32자 이상**이어야 서버가 기동된다(`hvo-server/src/config/env.ts`의 `validateEnv`).
+- **`SESSION_SECRET`**, DB 비밀번호, 외부 API 키 등: **소스에 기본값·샘플 시크릿을 넣지 않는다.** (과거 `hvo-jwt-secret` 같은 하드코딩 금지)
 - Excel/시드 등 **예시 비밀번호**는 실제 서비스에서 쓰이는 값(`password123` 등)을 쓰지 않고, “임포트 후 변경”이 분명한 문구를 사용한다.
 
 ### 인증 및 권한
@@ -1033,7 +1033,7 @@ MVS은 **현대적이고 확장 가능한 기업용 통합 업무 관리 시스�
 - **프론트엔드 빌드 변수**  
   - API가 **별도 Railway 서비스/도메인**이면 빌드 시 **`REACT_APP_API_URL`** = `https://<백엔드 호스트>/api` 형태로 설정(끝에 `/api` 없으면 `api.ts`에서 보정).  
   - 미설정 시 **동일 오리진의 `/api`**로 요청하며 콘솔에 경고가 출력된다(같은 서비스에서 리버스 프록시로 `/api`만 넘기는 구성용).
-- **DB 덤프 복원**: 로컬에 PostgreSQL 클라이언트(`pg_restore`/`psql`) 설치 후, Railway `DATABASE_URL`을 설정하고 `cd msv-server && npm run db:restore:railway` (기본 `backup/mvs_db.dump`). 자세한 절차는 **`docs/SERVER_START_GUIDE.md`** 의 「Railway에 DB 덤프 복원하기」절.
+- **DB 덤프 복원**: 로컬에 PostgreSQL 클라이언트(`pg_restore`/`psql`) 설치 후, Railway `DATABASE_URL`을 설정하고 `cd hvo-server && npm run db:restore:railway` (기본 `backup/hvo_db.dump`). 자세한 절차는 **`docs/SERVER_START_GUIDE.md`** 의 「Railway에 DB 덤프 복원하기」절.
 - **백엔드 배포 절차·설정 표**: **`docs/RAILWAY_BACKEND_DEPLOY.md`**
 
 ### 백엔드 테스트(Jest)
@@ -1049,8 +1049,8 @@ MVS은 **현대적이고 확장 가능한 기업용 통합 업무 관리 시스�
 # 로컬 개발
 net start postgresql-x64-17  # PostgreSQL 시작
 net start redis              # Redis 시작
-cd msv-server && npm run dev # 백엔드 실행
-cd msv-frontend && npm start # 프론트엔드 실행
+cd hvo-server && npm run dev # 백엔드 실행
+cd hvo-frontend && npm start # 프론트엔드 실행
 
 # Railway 배포
 git push origin main         # 자동 배포
@@ -1061,10 +1061,10 @@ railway up                  # 수동 배포
 ```
 MVS/
 ├── nixpacks.toml              # Railway 배포 설정
-├── msv-server/
+├── hvo-server/
 │   ├── nixpacks.toml          # 백엔드 배포 설정
 │   └── railway.json           # Railway 서비스 설정
-└── msv-frontend/
+└── hvo-frontend/
     ├── nixpacks.toml          # 프론트엔드 배포 설정
     └── railway.json           # Railway 서비스 설정
 ```
@@ -1084,4 +1084,4 @@ MVS/
 
 ---
 
-**MVS 1인 개발자와 함께 차세대 기업용 시스템을 만들어가세요!**
+**Hyvision One 1인 개발자와 함께 차세대 기업용 시스템을 만들어가세요!**

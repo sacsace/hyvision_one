@@ -84,7 +84,7 @@ Error: listen EADDRINUSE
 ### 1. 배포 로그 확인 (가장 중요!)
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭 클릭
 3. 최신 배포(CRASHED) 클릭
 4. **"Deploy Logs"** 탭 클릭
@@ -175,7 +175,7 @@ Error: listen EADDRINUSE: address already in use :::3000
 ## 🔍 단계별 진단
 
 ### 1단계: 배포 로그 확인
-- Railway 대시보드 → mvs-frontend → Deployments → Deploy Logs
+- Railway 대시보드 → hvo-frontend → Deployments → Deploy Logs
 - 시작 단계 로그 확인
 - 구체적인 오류 메시지 확인
 

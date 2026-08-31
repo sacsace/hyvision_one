@@ -1,8 +1,8 @@
 # Railway 배포 다음 단계 실행 가이드
 
 ## 🎯 현재 상태
-- ✅ mvs-backend: Online
-- ✅ mvs-frontend: Online
+- ✅ hvo-backend: Online
+- ✅ hvo-frontend: Online
 - ✅ Postgres: Online (연결 시도 중)
 - ⏳ 환경 변수 설정 필요
 - ⏳ 데이터베이스 마이그레이션 필요
@@ -13,9 +13,9 @@
 
 ### 1단계: 환경 변수 설정 (필수)
 
-#### 백엔드 (mvs-backend) 환경 변수 추가
+#### 백엔드 (hvo-backend) 환경 변수 추가
 
-Railway 대시보드 → **mvs-backend** → **Variables** → **New Variable**
+Railway 대시보드 → **hvo-backend** → **Variables** → **New Variable**
 
 **1. SESSION_SECRET 추가**
 ```
@@ -29,16 +29,16 @@ Name: HOST
 Value: 0.0.0.0
 ```
 
-#### 프론트엔드 (mvs-frontend) 환경 변수 추가
+#### 프론트엔드 (hvo-frontend) 환경 변수 추가
 
-Railway 대시보드 → **mvs-frontend** → **Variables** → **New Variable**
+Railway 대시보드 → **hvo-frontend** → **Variables** → **New Variable**
 
 **1. REACT_APP_API_URL 추가**
 
 먼저 백엔드 URL을 확인하세요:
-- Railway 대시보드 → **mvs-backend** → **Settings**
+- Railway 대시보드 → **hvo-backend** → **Settings**
 - "Generate Domain" 클릭 또는 기존 도메인 확인
-- 예: `https://mvs-backend-production.up.railway.app`
+- 예: `https://hvo-backend-production.up.railway.app`
 
 그 다음 프론트엔드에 추가:
 ```
@@ -49,7 +49,7 @@ Value: https://your-backend-url.railway.app/api
 또는 Railway 변수 참조 사용 (권장):
 ```
 Name: REACT_APP_API_URL
-Value: ${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
+Value: ${{hvo-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 ```
 
 ---
@@ -72,12 +72,12 @@ cd "D:\Software Project\MVS"
 railway link
 
 # 마이그레이션 실행
-railway run --service mvs-backend npm run db:migrate
+railway run --service hvo-backend npm run db:migrate
 ```
 
 #### 방법 B: Railway 대시보드 사용
 
-1. Railway 대시보드 → **mvs-backend** 서비스
+1. Railway 대시보드 → **hvo-backend** 서비스
 2. **Deployments** 탭 클릭
 3. 최신 배포의 **"..." 메뉴** → **"Open Shell"** 클릭
 4. 터미널에서 실행:
@@ -87,7 +87,7 @@ railway run --service mvs-backend npm run db:migrate
 
 #### 방법 C: Railway One-off Command
 
-1. Railway 대시보드 → **mvs-backend** 서비스
+1. Railway 대시보드 → **hvo-backend** 서비스
 2. **Settings** → **Deploy** 섹션
 3. **"Run Command"** 또는 **"One-off Command"** 옵션 사용
 4. 명령어 입력: `npm run db:migrate`
@@ -123,7 +123,7 @@ SELECT * FROM "SequelizeMeta" ORDER BY name;
 
 ```bash
 # Railway CLI 사용
-railway run --service mvs-backend npm run db:seed
+railway run --service hvo-backend npm run db:seed
 
 # 또는 Railway 대시보드 터미널에서
 npm run db:seed
@@ -255,10 +255,10 @@ railway login
 railway link
 
 # 마이그레이션 실행
-railway run --service mvs-backend npm run db:migrate
+railway run --service hvo-backend npm run db:migrate
 
 # 로그 확인
-railway logs --service mvs-backend
+railway logs --service hvo-backend
 ```
 
 ### 중요한 URL

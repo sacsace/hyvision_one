@@ -1,7 +1,7 @@
 # Railway Postgres volume fix + DB connection check
 # Before run: railway login
-#             cd msv-server
-#             railway link -p d8a07574-bfb8-4edd-8a34-80bf46beee1d -s mvs-backend
+#             cd hvo-server
+#             railway link -p d8a07574-bfb8-4edd-8a34-80bf46beee1d -s hvo-backend
 
 param(
     [switch]$SkipVolumeFix,
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$serverDir = Join-Path $root "msv-server"
+$serverDir = Join-Path $root "hvo-server"
 
 function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 
@@ -51,10 +51,10 @@ try {
         throw "Postgres DATABASE_URL not found."
     }
 
-    Write-Step "Set mvs-backend DATABASE_URL"
+    Write-Step "Set hvo-backend DATABASE_URL"
     railway variable set "DATABASE_URL=$internalUrl" --json 2>&1
 
-    Write-Step "Redeploy mvs-backend"
+    Write-Step "Redeploy hvo-backend"
     railway redeploy --yes 2>&1
 
     Write-Host "Waiting 90s for deploy..." -ForegroundColor Yellow
@@ -62,19 +62,19 @@ try {
 
     Write-Step "Check /health"
     try {
-        $health = Invoke-RestMethod -Uri "https://mvs-backend-production.up.railway.app/health" -TimeoutSec 20
+        $health = Invoke-RestMethod -Uri "https://hvo-backend-production.up.railway.app/health" -TimeoutSec 20
         Write-Host "OK: $($health | ConvertTo-Json -Compress)" -ForegroundColor Green
     } catch {
         Write-Host "Health check failed - see Deploy Logs" -ForegroundColor Red
     }
 
     if ($RunMigrations) {
-        Write-Step "Run migrations via SSH on mvs-backend"
-        railway ssh --service mvs-backend -- node scripts/run-migrations.cjs 2>&1
+        Write-Step "Run migrations via SSH on hvo-backend"
+        railway ssh --service hvo-backend -- node scripts/run-migrations.cjs 2>&1
     }
 
     Write-Step "Done"
-    Write-Host "Verify: Postgres logs, /health, login at www.mvsystem.in" -ForegroundColor Gray
+    Write-Host "Verify: Postgres logs, /health, login at www.hvoystem.in" -ForegroundColor Gray
     if ($publicUrl) {
         Write-Host "Local migration test: set DATABASE_URL from DATABASE_PUBLIC_URL + sslmode=require" -ForegroundColor Gray
     }

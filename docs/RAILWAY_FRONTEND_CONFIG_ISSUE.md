@@ -6,7 +6,7 @@
 - ✅ `CI`: `false` - 올바름
 - ✅ `HOST`: `0.0.0.0` - 문제 없음 (하지만 프론트엔드에는 필요 없을 수 있음)
 - ✅ `NODE_ENV`: `production` - 올바름
-- ✅ `REACT_APP_API_URL`: `https://mvs-backend-production.up.railway.app/api` - 올바름
+- ✅ `REACT_APP_API_URL`: `https://hvo-backend-production.up.railway.app/api` - 올바름
 
 ### 설정 파일 확인
 
@@ -160,7 +160,7 @@ cmds = ["unset CI; export CI=false; export GENERATE_SOURCEMAP=false; npm run bui
 ### 3. HOST 환경 변수 제거 (선택사항)
 
 프론트엔드에는 필요 없으므로 제거 가능:
-- Railway 대시보드 → mvs-frontend → Variables
+- Railway 대시보드 → hvo-frontend → Variables
 - `HOST` 변수 삭제
 
 ---

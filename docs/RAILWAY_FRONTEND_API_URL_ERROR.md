@@ -27,10 +27,10 @@
 2. **현재 문제**
    - `nixpacks.toml`의 `[env]` 섹션은 런타임 환경 변수만 설정
    - 빌드 시점에 `REACT_APP_API_URL`이 설정되지 않음
-   - 코드가 기본값인 `localhost:5000/api` 또는 `localhost:3001`을 사용
+   - 코드가 기본값인 `localhost:5010/api` 또는 `localhost:3001`을 사용
 
 3. **에러 메시지의 `localhost:3001`**
-   - 코드에서 `localhost:5000`을 사용하도록 되어 있지만
+   - 코드에서 `localhost:5010`을 사용하도록 되어 있지만
    - 다른 곳에서 `localhost:3001`을 사용하고 있을 수 있음
    - 또는 브라우저가 자동으로 포트를 변경했을 수 있음
 
@@ -47,7 +47,7 @@ cmds = [
   "unset CI",
   "export CI=false",
   "export GENERATE_SOURCEMAP=false",
-  "export REACT_APP_API_URL=${REACT_APP_API_URL:-https://mvs-backend-production.up.railway.app/api}",
+  "export REACT_APP_API_URL=${REACT_APP_API_URL:-https://hvo-backend-production.up.railway.app/api}",
   "npm run build"
 ]
 ```
@@ -62,7 +62,7 @@ cmds = [
 ### 방법 2: Railway 대시보드에서 환경 변수 설정 (필수)
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Variables** 탭 클릭
 3. **New Variable** 클릭
 4. 다음 설정 추가:
@@ -73,11 +73,11 @@ Value: https://your-backend-url.railway.app/api
 ```
 
 **백엔드 URL 확인 방법:**
-1. Railway 대시보드 → **mvs-backend** 서비스 선택
+1. Railway 대시보드 → **hvo-backend** 서비스 선택
 2. **Settings** 탭 클릭
 3. **"Generate Domain"** 클릭 또는 기존 도메인 확인
-4. 예: `https://mvs-backend-production.up.railway.app`
-5. API URL: `https://mvs-backend-production.up.railway.app/api`
+4. 예: `https://hvo-backend-production.up.railway.app`
+5. API URL: `https://hvo-backend-production.up.railway.app/api`
 
 ---
 
@@ -86,7 +86,7 @@ Value: https://your-backend-url.railway.app/api
 **Railway 대시보드에서:**
 ```
 Name: REACT_APP_API_URL
-Value: ${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
+Value: ${{hvo-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 ```
 
 **장점:**
@@ -100,25 +100,25 @@ Value: ${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 ### 1단계: 백엔드 URL 확인
 
 1. Railway 대시보드 접속
-2. **mvs-backend** 서비스 선택
+2. **hvo-backend** 서비스 선택
 3. **Settings** 탭 클릭
 4. 도메인 확인 또는 생성
 5. 백엔드 URL 기록
-   - 예: `https://mvs-backend-production.up.railway.app`
-   - API URL: `https://mvs-backend-production.up.railway.app/api`
+   - 예: `https://hvo-backend-production.up.railway.app`
+   - API URL: `https://hvo-backend-production.up.railway.app/api`
 
 ---
 
 ### 2단계: 프론트엔드 환경 변수 설정
 
-1. Railway 대시보드 → **mvs-frontend** 서비스 선택
+1. Railway 대시보드 → **hvo-frontend** 서비스 선택
 2. **Variables** 탭 클릭
 3. **New Variable** 클릭
 4. 다음 설정:
 
 ```
 Name: REACT_APP_API_URL
-Value: https://mvs-backend-production.up.railway.app/api
+Value: https://hvo-backend-production.up.railway.app/api
 ```
 
 (실제 백엔드 URL로 변경)
@@ -135,7 +135,7 @@ Value: https://mvs-backend-production.up.railway.app/api
 
 ### 4단계: 재배포
 
-1. Railway 대시보드에서 **mvs-frontend** 서비스 선택
+1. Railway 대시보드에서 **hvo-frontend** 서비스 선택
 2. **Deployments** 탭 클릭
 3. **"Redeploy"** 클릭
 4. 배포 완료 대기
@@ -148,7 +148,7 @@ Value: https://mvs-backend-production.up.railway.app/api
 2. 개발자 도구 (F12) → **Console** 탭 열기
 3. 다음 메시지 확인:
    ```
-   🔧 환경 변수에서 API URL 사용: https://mvs-backend-production.up.railway.app/api
+   🔧 환경 변수에서 API URL 사용: https://hvo-backend-production.up.railway.app/api
    ```
 4. 로그인 시도
 5. 에러 메시지가 사라졌는지 확인
@@ -174,8 +174,8 @@ Value: https://mvs-backend-production.up.railway.app/api
 ## 🎯 체크리스트
 
 ### Railway 대시보드 설정
-- [ ] 백엔드 URL 확인 (`mvs-backend` → Settings)
-- [ ] 프론트엔드 환경 변수 추가 (`mvs-frontend` → Variables)
+- [ ] 백엔드 URL 확인 (`hvo-backend` → Settings)
+- [ ] 프론트엔드 환경 변수 추가 (`hvo-frontend` → Variables)
 - [ ] `REACT_APP_API_URL` 설정
 - [ ] 값이 올바른 백엔드 URL인지 확인
 
@@ -217,26 +217,26 @@ Value: https://mvs-backend-production.up.railway.app/api
 
 **올바른 형식:**
 ```
-https://mvs-backend-production.up.railway.app/api
+https://hvo-backend-production.up.railway.app/api
 ```
 
 **잘못된 형식:**
 ```
-https://mvs-backend-production.up.railway.app/api/  (끝에 슬래시)
-http://mvs-backend-production.up.railway.app/api   (http 사용)
-mvs-backend-production.up.railway.app/api          (프로토콜 없음)
+https://hvo-backend-production.up.railway.app/api/  (끝에 슬래시)
+http://hvo-backend-production.up.railway.app/api   (http 사용)
+hvo-backend-production.up.railway.app/api          (프로토콜 없음)
 ```
 
 ### CORS 설정 확인
 
 백엔드의 `CORS_ORIGIN` 환경 변수에 프론트엔드 URL이 포함되어 있는지 확인:
 ```
-CORS_ORIGIN=https://mvs-frontend-production.up.railway.app
+CORS_ORIGIN=https://hvo-frontend-production.up.railway.app
 ```
 
 또는 여러 도메인:
 ```
-CORS_ORIGIN=https://mvs-frontend-production.up.railway.app,https://www.mvsystem.in
+CORS_ORIGIN=https://hvo-frontend-production.up.railway.app,https://www.hvoystem.in
 ```
 
 ---

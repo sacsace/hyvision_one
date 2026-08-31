@@ -8,22 +8,22 @@
 
 ## 🔧 수정된 파일
 
-### 1. `msv-server/env.development`
+### 1. `hvo-server/env.development`
 ```diff
-- CORS_ORIGIN=http://localhost:3000,http://localhost:3001,http://localhost:3002
-+ CORS_ORIGIN=http://localhost:3000
+- CORS_ORIGIN=http://localhost:3010,http://localhost:3001,http://localhost:3002
++ CORS_ORIGIN=http://localhost:3010
 ```
 
-### 2. `msv-server/src/index.ts`
+### 2. `hvo-server/src/index.ts`
 ```diff
-- return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
-+ return ['http://localhost:3000'];
+- return ['http://localhost:3010', 'http://localhost:3001', 'http://localhost:3002'];
++ return ['http://localhost:3010'];
 ```
 
-### 3. `msv-server/src/config/constants.ts`
+### 3. `hvo-server/src/config/constants.ts`
 ```diff
-- DEFAULT_CORS_ORIGIN: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
-+ DEFAULT_CORS_ORIGIN: ['http://localhost:3000'],
+- DEFAULT_CORS_ORIGIN: ['http://localhost:3010', 'http://localhost:3001', 'http://localhost:3002'],
++ DEFAULT_CORS_ORIGIN: ['http://localhost:3010'],
 ```
 
 ---
@@ -32,11 +32,11 @@
 
 ### 프론트엔드
 - **포트**: `3000` (고정)
-- **설정**: `package.json`의 `start` 스크립트에 `PORT=3000` 설정됨
+- **설정**: `package.json`의 `start` 스크립트에 `PORT=3010` 설정됨
 
 ### 백엔드
 - **포트**: `5000` (고정)
-- **CORS**: `http://localhost:3000`만 허용
+- **CORS**: `http://localhost:3010`만 허용
 
 ---
 
@@ -62,13 +62,13 @@ taskkill /PID <PID번호> /F
 
 **3. 프론트엔드 재시작:**
 ```bash
-cd msv-frontend
+cd hvo-frontend
 npm start
 ```
 
 **4. 백엔드 재시작 (CORS 설정 적용):**
 ```bash
-cd msv-server
+cd hvo-server
 npm run dev
 ```
 
@@ -77,15 +77,15 @@ npm run dev
 ## ✅ 확인 사항
 
 ### 프론트엔드
-- [ ] `http://localhost:3000`에서 실행 중인지 확인
-- [ ] 브라우저에서 `http://localhost:3000` 접속 가능한지 확인
+- [ ] `http://localhost:3010`에서 실행 중인지 확인
+- [ ] 브라우저에서 `http://localhost:3010` 접속 가능한지 확인
 
 ### 백엔드
-- [ ] `http://localhost:5000`에서 실행 중인지 확인
-- [ ] CORS 설정이 `http://localhost:3000`만 허용하는지 확인
+- [ ] `http://localhost:5010`에서 실행 중인지 확인
+- [ ] CORS 설정이 `http://localhost:3010`만 허용하는지 확인
 
 ### 연결 확인
-- [ ] 브라우저 Console에서 API URL이 `http://localhost:5000/api`인지 확인
+- [ ] 브라우저 Console에서 API URL이 `http://localhost:5010/api`인지 확인
 - [ ] 로그인 시도 시 오류가 없는지 확인
 
 ---
@@ -93,7 +93,7 @@ npm run dev
 ## 💡 참고
 
 **프론트엔드 포트 설정:**
-- `msv-frontend/package.json`의 `start` 스크립트: `set PORT=3000 && react-scripts start`
+- `hvo-frontend/package.json`의 `start` 스크립트: `set PORT=3010 && react-scripts start`
 - 이 설정으로 프론트엔드는 항상 3000 포트에서 실행됩니다
 
 **3000 포트가 사용 중인 경우:**
@@ -113,4 +113,4 @@ npm run dev
 1. 3000 포트를 사용하는 프로세스 확인 및 종료
 2. 프론트엔드 재시작
 3. 백엔드 재시작
-4. `http://localhost:3000`에서 접속 확인
+4. `http://localhost:3010`에서 접속 확인

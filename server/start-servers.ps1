@@ -1,4 +1,4 @@
-# MVS Server Start Wrapper
+# Hyvision One Server Start Wrapper
 # Delegates to start-server.ps1 for consistency
 
 param(

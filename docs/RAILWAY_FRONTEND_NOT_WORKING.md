@@ -18,7 +18,7 @@
 ### 정상 작동 시 보이는 것
 - React 앱의 로그인 페이지
 - 또는 대시보드 (로그인된 경우)
-- MVS 애플리케이션 UI
+- Hyvision One 애플리케이션 UI
 - Railway 기본 페이지가 아닌 실제 앱
 
 ---
@@ -28,7 +28,7 @@
 ### 1. Railway 대시보드에서 서비스 상태 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. 서비스 상태 확인:
    - ✅ **"Online"** - 정상 작동 중
    - ❌ **"Crashed"** - 크래시됨
@@ -37,7 +37,7 @@
 ### 2. 배포 로그 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭 클릭
 3. 최신 배포 클릭
 4. **"Deploy Logs"** 탭 클릭
@@ -50,14 +50,14 @@ Compiled successfully!
 
 [start]
 Serving!
-- Local:    http://localhost:3000
+- Local:    http://localhost:3010
 - Network:  http://0.0.0.0:3000
 ```
 
 **문제가 있는 경우:**
 ```
 [start]
-This is a monorepo root. Please deploy msv-server or msv-frontend services separately.
+This is a monorepo root. Please deploy hvo-server or hvo-frontend services separately.
 또는
 Error: ENOENT: no such file or directory, open 'build/index.html'
 또는
@@ -71,11 +71,11 @@ Deploy crashed
 ### 1단계: Root Directory 설정 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Settings** 탭 클릭
 3. **"Root Directory"** 또는 **"Source"** 섹션 확인
-4. 값이 **`msv-frontend`**로 설정되어 있는지 확인
-5. 설정되어 있지 않다면 **`msv-frontend`**로 설정
+4. 값이 **`hvo-frontend`**로 설정되어 있는지 확인
+5. 설정되어 있지 않다면 **`hvo-frontend`**로 설정
 6. **Save** 클릭
 
 ### 2단계: 재배포
@@ -86,7 +86,7 @@ Deploy crashed
 ### 3단계: 배포 로그 확인
 
 - 배포 로그에서 다음 확인:
-  - `msv-frontend` 디렉토리에서 빌드가 시작되는지
+  - `hvo-frontend` 디렉토리에서 빌드가 시작되는지
   - 빌드가 성공했는지
   - 시작 명령이 올바른지
   - "Serving!" 메시지가 나오는지
@@ -114,9 +114,9 @@ Deploy crashed
 ## 🎯 빠른 체크리스트
 
 ### Railway 대시보드 확인
-- [ ] mvs-frontend 서비스 상태 확인
+- [ ] hvo-frontend 서비스 상태 확인
 - [ ] Settings → Root Directory 확인
-- [ ] Root Directory가 `msv-frontend`로 설정되어 있는지 확인
+- [ ] Root Directory가 `hvo-frontend`로 설정되어 있는지 확인
 
 ### 배포 로그 확인
 - [ ] Deployments → 최신 배포 → Deploy Logs
@@ -134,18 +134,18 @@ Deploy crashed
 ## 💡 정상 작동 시 보이는 것
 
 ### 로그인 페이지 (로그인하지 않은 경우)
-- MVS 로그인 폼
+- Hyvision One 로그인 폼
 - 사용자명/비밀번호 입력 필드
 - 로그인 버튼
 
 ### 대시보드 (로그인한 경우)
-- MVS 대시보드
+- Hyvision One 대시보드
 - 사이드바 메뉴
 - 데이터 차트 및 통계
 
 ### Railway 기본 페이지가 아닌 실제 앱
 - React 앱의 UI
-- MVS 브랜딩
+- Hyvision One 브랜딩
 - 실제 기능이 작동하는 페이지
 
 ---
@@ -179,11 +179,11 @@ Deploy crashed
 
 정상적인 경우:
 - ✅ React 앱의 로그인 페이지 또는 대시보드 표시
-- ✅ MVS 애플리케이션 UI 표시
+- ✅ Hyvision One 애플리케이션 UI 표시
 
 **다음 단계:**
 1. Railway 대시보드에서 Root Directory 설정 확인
-2. `msv-frontend`로 설정되어 있는지 확인
+2. `hvo-frontend`로 설정되어 있는지 확인
 3. 재배포
 4. 배포 로그 확인
 5. 브라우저에서 다시 접속 확인

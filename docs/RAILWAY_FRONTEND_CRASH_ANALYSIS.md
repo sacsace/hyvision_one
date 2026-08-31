@@ -3,7 +3,7 @@
 ## 🔴 현재 상태
 
 **문제:**
-- mvs-frontend 서비스가 "Crashed in 1 second" 상태
+- hvo-frontend 서비스가 "Crashed in 1 second" 상태
 - 1초 만에 크래시되었다는 것은 서비스가 시작되자마자 즉시 종료되었다는 의미
 
 ---
@@ -80,7 +80,7 @@ npm ERR! Cannot find module
 
 ### Railway 배포 로그 확인 (가장 중요!)
 
-1. Railway 대시보드 → **mvs-frontend** 서비스
+1. Railway 대시보드 → **hvo-frontend** 서비스
 2. **Deployments** 탭 클릭
 3. 최신 배포 (CRASHED 상태) 클릭
 4. **"View Logs"** 또는 **"Logs"** 클릭
@@ -170,7 +170,7 @@ Error: listen EADDRINUSE: address already in use :::3000
 ## 🔍 단계별 진단
 
 ### 1단계: 배포 로그 확인
-- Railway 대시보드 → mvs-frontend → Deployments → Logs
+- Railway 대시보드 → hvo-frontend → Deployments → Logs
 - 구체적인 오류 메시지 확인
 
 ### 2단계: 빌드 성공 여부 확인
@@ -198,7 +198,7 @@ Error: listen EADDRINUSE: address already in use :::3000
 ### 방법 2: 빌드 확인
 - 로컬에서 빌드 테스트:
   ```bash
-  cd msv-frontend
+  cd hvo-frontend
   npm run build
   ```
 - `build` 폴더가 생성되는지 확인
@@ -206,7 +206,7 @@ Error: listen EADDRINUSE: address already in use :::3000
 ### 방법 3: 시작 명령 테스트
 - 로컬에서 시작 명령 테스트:
   ```bash
-  cd msv-frontend
+  cd hvo-frontend
   npm run build
   npm run start:railway
   ```

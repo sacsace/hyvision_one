@@ -1,4 +1,4 @@
--- MVS 기본 사용자 생성 스크립트
+-- Hyvision One 기본 사용자 생성 스크립트
 
 -- 기본 사용자 생성 (root 사용자)
 INSERT INTO "user" (
@@ -23,7 +23,7 @@ INSERT INTO "user" (
     1,
     'root',
     'Root User',
-    'root@mvs.com',
+    'root@hvo.com',
     '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8K8K8K8', -- password: admin123
     'root',
     'IT',
@@ -60,7 +60,7 @@ INSERT INTO "user" (
     1,
     'admin',
     'Admin User',
-    'admin@mvs.com',
+    'admin@hvo.com',
     '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8K8K8K8', -- password: admin123
     'admin',
     'Management',
@@ -97,7 +97,7 @@ INSERT INTO "user" (
     1,
     'user1',
     'Test User',
-    'user@mvs.com',
+    'user@hvo.com',
     '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8K8K8K8', -- password: admin123
     'user',
     'Sales',

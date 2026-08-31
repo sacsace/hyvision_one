@@ -1,8 +1,8 @@
 # 개발서버 → Railway 운영 동기화 (스키마·메뉴·사용자)
 param(
-  [string]$BackendUrl = "https://mvs-backend-production.up.railway.app",
-  [string]$BootstrapKey = "mvs-super-secret-jwt-key-2025-prod!!",
-  [string]$DevApiBase = "http://localhost:5000/api",
+  [string]$BackendUrl = "https://hvo-backend-production.up.railway.app",
+  [string]$BootstrapKey = "hvo-super-secret-jwt-key-2025-prod!!",
+  [string]$DevApiBase = "http://localhost:5010/api",
   [switch]$SkipExport,
   [switch]$SkipMigrate,
   [switch]$SkipMenus,
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$serverDir = Join-Path $root "msv-server"
+$serverDir = Join-Path $root "hvo-server"
 
 function Invoke-Bootstrap {
   param([hashtable]$ExtraHeaders, [string]$Label)
@@ -31,7 +31,7 @@ try {
     Write-Host "`n=== 2) 개발 사용자·부서 export ==="
     Push-Location $serverDir
     $env:NODE_ENV = "development"
-    $env:DATABASE_URL = "postgresql://mvs_user:Korean%402026@localhost:5432/mvs"
+    $env:DATABASE_URL = "postgresql://hvo_user:Korean%402026@localhost:5432/hvo"
     node scripts/export-departments.cjs
     node scripts/export-users.cjs
     Pop-Location
@@ -67,7 +67,7 @@ try {
     $userResp | ConvertTo-Json -Compress
   }
 
-  Write-Host "`n✅ 개발→운영 동기화 완료. https://www.mvsystem.in 새로고침 후 메뉴를 확인하세요."
+  Write-Host "`n✅ 개발→운영 동기화 완료. https://www.hvoystem.in 새로고침 후 메뉴를 확인하세요."
 } finally {
   Pop-Location
 }

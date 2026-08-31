@@ -1,4 +1,4 @@
-# MVS - 단순하고 파워풀한 개발환경
+# Hyvision One - 단순하고 파워풀한 개발환경
 
 ## 🚀 빠른 시작
 
@@ -16,8 +16,8 @@ npm run dev
 MVS/
 ├── .env                 # 모든 개발 설정 (하나로 통합)
 ├── dev.ps1             # 원클릭 개발 서버 시작
-├── msv-server/         # 백엔드
-└── msv-frontend/       # 프론트엔드
+├── hvo-server/         # 백엔드
+└── hvo-frontend/       # 프론트엔드
 ```
 
 ## ⚡ 핵심 명령어
@@ -35,7 +35,7 @@ npm run build        # 프로덕션 빌드
 
 ## 📝 접속 정보
 
-- 프론트엔드: http://localhost:3000
-- 백엔드 API: http://localhost:5000
+- 프론트엔드: http://localhost:3010
+- 백엔드 API: http://localhost:5010
 - 테스트 계정: root / admin123
 

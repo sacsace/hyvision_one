@@ -1,0 +1,41 @@
+{
+  "development": {
+    "username": "hvo_user",
+    "password": "Korean@2026",
+    "database": "hyvision_one",
+    "host": "localhost",
+    "port": 5433,
+    "dialect": "postgres",
+    "logging": true,
+    "pool": {
+      "max": 5,
+      "min": 0,
+      "acquire": 30000,
+      "idle": 10000
+    }
+  },
+  "test": {
+    "username": "hvo_user",
+    "password": "Korean@2026",
+    "database": "hyvision_one_test",
+    "host": "localhost",
+    "port": 5433,
+    "dialect": "postgres",
+    "logging": false
+  },
+  "production": {
+    "username": "hvo_user",
+    "password": "Korean@2026",
+    "database": "hyvision_one",
+    "host": "localhost",
+    "port": 5433,
+    "dialect": "postgres",
+    "logging": false,
+    "pool": {
+      "max": 20,
+      "min": 5,
+      "acquire": 60000,
+      "idle": 10000
+    }
+  }
+}

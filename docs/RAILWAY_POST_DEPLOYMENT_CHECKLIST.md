@@ -1,14 +1,14 @@
 # Railway 배포 후 체크리스트
 
 ## ✅ 현재 상태
-- ✅ mvs-backend: Online
-- ✅ mvs-frontend: Online  
+- ✅ hvo-backend: Online
+- ✅ hvo-frontend: Online  
 - ⏳ Postgres: Building
 
 ## 🔧 필수 환경 변수 설정
 
-### 백엔드 (mvs-backend) 환경 변수
-Railway 대시보드 → mvs-backend → Variables에서 다음 변수들을 설정하세요:
+### 백엔드 (hvo-backend) 환경 변수
+Railway 대시보드 → hvo-backend → Variables에서 다음 변수들을 설정하세요:
 
 ```bash
 # 필수 보안 설정
@@ -24,15 +24,15 @@ CORS_ORIGIN=https://your-frontend-url.railway.app,https://your-custom-domain.com
 DATABASE_URL=$DATABASE_URL  # PostgreSQL 서비스 연결 시 자동 생성
 ```
 
-### 프론트엔드 (mvs-frontend) 환경 변수
-Railway 대시보드 → mvs-frontend → Variables에서 다음 변수들을 설정하세요:
+### 프론트엔드 (hvo-frontend) 환경 변수
+Railway 대시보드 → hvo-frontend → Variables에서 다음 변수들을 설정하세요:
 
 ```bash
 # API URL (백엔드 URL)
 REACT_APP_API_URL=https://your-backend-url.railway.app/api
 
 # 또는 Railway가 자동 생성한 백엔드 URL 사용
-REACT_APP_API_URL=${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
+REACT_APP_API_URL=${{hvo-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 ```
 
 ## 📊 데이터베이스 설정
@@ -42,16 +42,16 @@ Postgres 서비스가 완료되면 마이그레이션을 실행하세요:
 
 ```bash
 # Railway CLI 사용
-railway run --service mvs-backend npm run db:migrate
+railway run --service hvo-backend npm run db:migrate
 
 # 또는 Railway 대시보드에서 터미널 접속 후
-cd msv-server
+cd hvo-server
 npm run db:migrate
 ```
 
 ### 2. 초기 데이터 시딩 (선택사항)
 ```bash
-railway run --service mvs-backend npm run db:seed
+railway run --service hvo-backend npm run db:seed
 ```
 
 ## 🔗 서비스 연결 확인
@@ -109,7 +109,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## 📝 로그 확인
 
 ### 1. 백엔드 로그
-Railway 대시보드 → mvs-backend → Deployments → Logs
+Railway 대시보드 → hvo-backend → Deployments → Logs
 
 확인 사항:
 - ✅ 데이터베이스 연결 성공
@@ -117,7 +117,7 @@ Railway 대시보드 → mvs-backend → Deployments → Logs
 - ❌ 에러 메시지 없음
 
 ### 2. 프론트엔드 로그
-Railway 대시보드 → mvs-frontend → Deployments → Logs
+Railway 대시보드 → hvo-frontend → Deployments → Logs
 
 확인 사항:
 - ✅ 빌드 성공

@@ -1,4 +1,4 @@
--- MVS 초기 데이터 삽입 스크립트
+-- Hyvision One 초기 데이터 삽입 스크립트
 
 -- 기본 테넌트 생성
 INSERT INTO tenant (tenant_code, name, domain, plan, status, settings) 
@@ -23,13 +23,13 @@ INSERT INTO company (
 ) 
 VALUES (
     1, 
-    'MVS Company', 
+    'Hyvision One Company', 
     '123-45-67890', 
     'CEO Name', 
     'Company Address', 
     '02-1234-5678', 
-    'info@mvs.com', 
-    'https://mvs.com', 
+    'info@hvo.com', 
+    'https://hvo.com', 
     'Technology', 
     0, 
     'enterprise', 

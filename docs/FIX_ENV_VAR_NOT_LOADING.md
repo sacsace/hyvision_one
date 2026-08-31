@@ -4,7 +4,7 @@
 
 Console에서 API URL이 `http://localhost:3001`로 표시됨
 - `.env.development` 파일은 존재하고 올바르게 설정됨
-- `REACT_APP_API_URL=http://localhost:5000/api` 설정됨
+- `REACT_APP_API_URL=http://localhost:5010/api` 설정됨
 - 하지만 환경 변수가 로드되지 않음
 
 ---
@@ -35,7 +35,7 @@ React는 다음 파일들을 **자동으로** 로드합니다:
 
 **2단계: 서버 재시작**
 ```bash
-cd msv-frontend
+cd hvo-frontend
 npm start
 ```
 
@@ -48,7 +48,7 @@ npm start
 
 **확인:**
 ```powershell
-cd msv-frontend
+cd hvo-frontend
 # 파일 이름 확인
 Get-ChildItem .env*
 
@@ -58,7 +58,7 @@ Get-Content .env.development | Select-String "REACT_APP_API_URL"
 
 **예상 출력:**
 ```
-REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=http://localhost:5010/api
 ```
 
 ---
@@ -69,7 +69,7 @@ REACT_APP_API_URL=http://localhost:5000/api
 
 다음 메시지가 나와야 합니다:
 ```javascript
-🔧 환경 변수에서 API URL 사용: http://localhost:5000/api
+🔧 환경 변수에서 API URL 사용: http://localhost:5010/api
 ```
 
 **만약 이 메시지가 없다면:**
@@ -87,7 +87,7 @@ REACT_APP_API_URL: (not set)
 
 **보이는 것:**
 - API Base URL: `http://localhost:3001` ❌
-- Window location: `http://localhost:3000/login` ✅
+- Window location: `http://localhost:3010/login` ✅
 - Port: `3000` ✅
 
 **의미:**
@@ -109,7 +109,7 @@ REACT_APP_API_URL: (not set)
 ```bash
 # 터미널에서 Ctrl+C로 서버 중지
 # 그 다음
-cd msv-frontend
+cd hvo-frontend
 npm start
 ```
 
@@ -136,9 +136,9 @@ npm start
 다음 메시지 확인:
 ```javascript
 === API Configuration ===
-API Base URL: http://localhost:5000/api  // ✅ 정상
-REACT_APP_API_URL: http://localhost:5000/api  // ✅ 정상
-🔧 환경 변수에서 API URL 사용: http://localhost:5000/api  // ✅ 정상
+API Base URL: http://localhost:5010/api  // ✅ 정상
+REACT_APP_API_URL: http://localhost:5010/api  // ✅ 정상
+🔧 환경 변수에서 API URL 사용: http://localhost:5010/api  // ✅ 정상
 ```
 
 ---
@@ -168,7 +168,7 @@ REACT_APP_API_URL: http://localhost:5000/api  // ✅ 정상
 ### 환경 변수 파일
 - [ ] `.env.development` 파일이 존재하는지 확인
 - [ ] 파일 이름이 `.env`로 시작하는지 확인
-- [ ] `REACT_APP_API_URL=http://localhost:5000/api` 설정 확인
+- [ ] `REACT_APP_API_URL=http://localhost:5010/api` 설정 확인
 
 ### 서버 재시작
 - [ ] 프론트엔드 서버를 완전히 중지
@@ -178,7 +178,7 @@ REACT_APP_API_URL: http://localhost:5000/api  // ✅ 정상
 ### 브라우저
 - [ ] 브라우저 완전 새로고침 (Ctrl+Shift+R)
 - [ ] 개발자 도구 Console에서 환경 변수 확인
-- [ ] API URL이 `http://localhost:5000/api`인지 확인
+- [ ] API URL이 `http://localhost:5010/api`인지 확인
 
 ---
 
@@ -198,4 +198,4 @@ REACT_APP_API_URL: http://localhost:5000/api  // ✅ 정상
 3. Console에서 환경 변수 확인
 
 **확인:**
-- Console에 `🔧 환경 변수에서 API URL 사용: http://localhost:5000/api` 메시지가 나와야 함
+- Console에 `🔧 환경 변수에서 API URL 사용: http://localhost:5010/api` 메시지가 나와야 함

@@ -1,9 +1,9 @@
 # 개발 백엔드 API에서 메뉴·권한 JSON 추출
-# 사용: .\scripts\export-menus-from-dev-api.ps1 [-DevApiBase "http://localhost:5000/api"] [-OutFile "backup\menus-dev-export.json"]
+# 사용: .\scripts\export-menus-from-dev-api.ps1 [-DevApiBase "http://localhost:5030/api"] [-OutFile "backup\menus-dev-export.json"]
 
 param(
-  [string]$DevApiBase = "http://localhost:5000/api",
-  [string]$OutFile = (Join-Path $PSScriptRoot "..\msv-server\data\menus-dev-export.json"),
+  [string]$DevApiBase = "http://localhost:5030/api",
+  [string]$OutFile = (Join-Path $PSScriptRoot "..\hvo-server\data\menus-dev-export.json"),
   [string]$UserId = "root",
   [string]$Password = "admin123",
   [int]$TenantId = 1

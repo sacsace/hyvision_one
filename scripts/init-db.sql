@@ -1,10 +1,10 @@
--- MVS 데이터베이스 초기화 스크립트
+-- Hyvision One 데이터베이스 초기화 스크립트
 -- PostgreSQL 15+ 호환
 
 -- 데이터베이스 생성 (필요시)
-CREATE DATABASE mvs;
-CREATE USER mvs_user WITH PASSWORD 'mvs_password';
-GRANT ALL PRIVILEGES ON DATABASE mvs TO mvs_user;
+CREATE DATABASE hvo;
+CREATE USER hvo_user WITH PASSWORD 'hvo_password';
+GRANT ALL PRIVILEGES ON DATABASE hvo TO hvo_user;
 
 -- 확장 기능 활성화
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -34,13 +34,13 @@ INSERT INTO company (
 ) 
 VALUES (
     1, 
-    'MVS Company', 
+    'Hyvision One Company', 
     '123-45-67890', 
     'CEO Name', 
     'Company Address', 
     '02-1234-5678', 
-    'info@mvs.com', 
-    'https://mvs.com', 
+    'info@hvo.com', 
+    'https://hvo.com', 
     'Technology', 
     0, 
     'enterprise', 
@@ -80,10 +80,10 @@ INSERT INTO menu (tenant_id, parent_id, code, name_ko, name_en, icon, route, com
 
 -- 기본 시스템 설정
 INSERT INTO system_settings (tenant_id, company_id, setting_key, setting_value, setting_type, description, is_encrypted) VALUES
-(1, 1, 'company_name', 'MVS Company', 'string', '회사명', false),
+(1, 1, 'company_name', 'Hyvision One Company', 'string', '회사명', false),
 (1, 1, 'company_address', 'Company Address', 'string', '회사 주소', false),
 (1, 1, 'company_phone', '02-1234-5678', 'string', '회사 전화번호', false),
-(1, 1, 'company_email', 'info@mvs.com', 'string', '회사 이메일', false),
+(1, 1, 'company_email', 'info@hvo.com', 'string', '회사 이메일', false),
 (1, 1, 'default_currency', 'KRW', 'string', '기본 통화', false),
 (1, 1, 'default_language', 'ko', 'string', '기본 언어', false),
 (1, 1, 'timezone', 'Asia/Seoul', 'string', '시간대', false),

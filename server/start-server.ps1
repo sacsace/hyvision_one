@@ -1,4 +1,4 @@
-# MVS server start script
+# Hyvision One server start script
 # Encoding: UTF-8
 
 param(
@@ -17,7 +17,7 @@ function Write-ColorOutput {
 }
 
 if ($Help) {
-    Write-ColorOutput "`nMVS server start script usage" "Cyan"
+    Write-ColorOutput "`nHyvision One server start script usage" "Cyan"
     Write-ColorOutput ("=" * 60) "Gray"
     Write-ColorOutput "`nUsage:" "Yellow"
     Write-ColorOutput "  .\server\start-server.ps1               # start backend + frontend"
@@ -33,7 +33,7 @@ if ($Help) {
     exit 0
 }
 
-Write-ColorOutput "`nMVS server start script" "Cyan"
+Write-ColorOutput "`nHyvision One server start script" "Cyan"
 Write-ColorOutput ("=" * 60) "Gray"
 
 if ($BackendOnly -and $FrontendOnly) {
@@ -41,7 +41,7 @@ if ($BackendOnly -and $FrontendOnly) {
     exit 1
 }
 
-# 스크립트 위치: MVS/server/*.ps1 → 저장소 루트는 한 단계 위
+# 스크립트 위치: Hyvision One/server/*.ps1 → 저장소 루트는 한 단계 위
 # 일부 실행 방식(인라인/특정 호스트)에서는 $PSScriptRoot가 비어 있을 수 있음
 $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
     $PSScriptRoot
@@ -51,16 +51,16 @@ $scriptDir = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
     $null
 }
 $rootPath = if ($scriptDir) { Split-Path -Parent $scriptDir } else { $null }
-if (-not $rootPath -or -not (Test-Path -LiteralPath (Join-Path $rootPath "msv-server"))) {
+if (-not $rootPath -or -not (Test-Path -LiteralPath (Join-Path $rootPath "hvo-server"))) {
     $cwd = (Get-Location -ErrorAction SilentlyContinue).Path
-    if ($cwd -and (Test-Path -LiteralPath (Join-Path $cwd "msv-server"))) {
+    if ($cwd -and (Test-Path -LiteralPath (Join-Path $cwd "hvo-server"))) {
         $rootPath = $cwd
     }
 }
-$msvServerAtRoot = if ($rootPath) { Join-Path $rootPath "msv-server" } else { $null }
-if (-not $rootPath -or -not (Test-Path -LiteralPath $msvServerAtRoot)) {
-    Write-ColorOutput "Could not resolve repository root (folder containing msv-server). Script directory was empty or invalid." "Red"
-    Write-ColorOutput "Run this script from the file: .\server\start-server.ps1 (from repo root), or cd to the MVS repo folder first." "Yellow"
+$hvoServerAtRoot = if ($rootPath) { Join-Path $rootPath "hvo-server" } else { $null }
+if (-not $rootPath -or -not (Test-Path -LiteralPath $hvoServerAtRoot)) {
+    Write-ColorOutput "Could not resolve repository root (folder containing hvo-server). Script directory was empty or invalid." "Red"
+    Write-ColorOutput "Run this script from the file: .\server\start-server.ps1 (from repo root), or cd to the Hyvision One repo folder first." "Yellow"
     exit 1
 }
 
@@ -93,14 +93,14 @@ function Stop-ProcessOnPort {
 function Test-Environment {
     Write-ColorOutput "`nChecking environment variables..." "Cyan"
 
-    $envFile = Join-Path $rootPath "msv-server\.env"
+    $envFile = Join-Path $rootPath "hvo-server\.env"
     $envExample = Join-Path $rootPath ".env"
 
     if (-not (Test-Path $envFile)) {
         Write-ColorOutput ".env file not found: $envFile" "Yellow"
         if (Test-Path $envExample) {
-            Write-ColorOutput "Copy the root .env to msv-server\.env:" "White"
-            Write-ColorOutput "  copy .env msv-server\.env" "Cyan"
+            Write-ColorOutput "Copy the root .env to hvo-server\.env:" "White"
+            Write-ColorOutput "  copy .env hvo-server\.env" "Cyan"
         }
         if (-not $SkipChecks) {
             Write-ColorOutput "Cannot start without environment file." "Red"
@@ -138,13 +138,13 @@ function Test-Dependencies {
         exit 1
     }
 
-    $backendModules = Join-Path $rootPath "msv-server\node_modules"
-    $frontendModules = Join-Path $rootPath "msv-frontend\node_modules"
+    $backendModules = Join-Path $rootPath "hvo-server\node_modules"
+    $frontendModules = Join-Path $rootPath "hvo-frontend\node_modules"
 
     if (-not $FrontendOnly) {
         if (-not (Test-Path $backendModules)) {
             Write-ColorOutput "Backend dependencies missing. Installing..." "Yellow"
-            Set-Location "$rootPath\msv-server"
+            Set-Location "$rootPath\hvo-server"
             npm install
             Set-Location $rootPath
         } else {
@@ -155,7 +155,7 @@ function Test-Dependencies {
     if (-not $BackendOnly) {
         if (-not (Test-Path $frontendModules)) {
             Write-ColorOutput "Frontend dependencies missing. Installing..." "Yellow"
-            Set-Location "$rootPath\msv-frontend"
+            Set-Location "$rootPath\hvo-frontend"
             npm install
             Set-Location $rootPath
         } else {
@@ -171,44 +171,46 @@ function Test-DatabaseConnection {
 function Start-BackendServer {
     Write-ColorOutput "`nStarting backend server..." "Cyan"
 
-    $backendPath = Join-Path $rootPath "msv-server"
+    $backendPath = Join-Path $rootPath "hvo-server"
     if (-not (Test-Path $backendPath)) {
         Write-ColorOutput "Backend directory not found: $backendPath" "Red"
         exit 1
     }
 
-    Stop-ProcessOnPort -Port 5000 -ServerName "Backend"
+    Stop-ProcessOnPort -Port 5030 -ServerName "Backend"
 
     $backendPathEscaped = $backendPath -replace "'", "''"
     $backendCmds = @(
         "Write-Host '========================================' -ForegroundColor Cyan",
-        "Write-Host '  MVS Backend Server' -ForegroundColor Cyan",
+        "Write-Host '  Hyvision One Backend Server' -ForegroundColor Cyan",
         "Write-Host '========================================' -ForegroundColor Cyan",
         "Set-Location '$backendPathEscaped'",
         "Remove-Item -Path Env:DATABASE_URL -ErrorAction SilentlyContinue",
+        "Set-Item -Path Env:PORT -Value 5030",
+        "Set-Item -Path Env:CORS_ORIGIN -Value 'http://localhost:3030'",
         "Set-Item -Path Env:DB_HOST -Value 'localhost'",
-        "Set-Item -Path Env:DB_PORT -Value 5432",
-        "Set-Item -Path Env:DB_NAME -Value 'mvs'",
-        "Set-Item -Path Env:DB_USER -Value 'mvs_user'",
+        "Set-Item -Path Env:DB_PORT -Value 5433",
+        "Set-Item -Path Env:DB_NAME -Value 'hyvision_one'",
+        "Set-Item -Path Env:DB_USER -Value 'hvo_user'",
         "Set-Item -Path Env:DB_PASSWORD -Value 'Korean@2026'",
         "npm run dev"
     )
     $command = $backendCmds -join "; "
 
     Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoExit", "-Command", $command)
-    Write-ColorOutput "Backend server started on port 5000." "Green"
+    Write-ColorOutput "Backend server started on port 5030." "Green"
 }
 
 function Start-FrontendServer {
     Write-ColorOutput "`nStarting frontend server..." "Cyan"
 
-    $frontendPath = Join-Path $rootPath "msv-frontend"
+    $frontendPath = Join-Path $rootPath "hvo-frontend"
     if (-not (Test-Path $frontendPath)) {
         Write-ColorOutput "Frontend directory not found: $frontendPath" "Red"
         exit 1
     }
 
-    Stop-ProcessOnPort -Port 3000 -ServerName "Frontend"
+    Stop-ProcessOnPort -Port 3030 -ServerName "Frontend"
 
     if (-not $FrontendOnly) {
         Write-ColorOutput "Waiting for backend to start (3s)..." "Yellow"
@@ -218,17 +220,17 @@ function Start-FrontendServer {
     $frontendPathEscaped = $frontendPath -replace "'", "''"
     $frontendCmds = @(
         "Write-Host '========================================' -ForegroundColor Green",
-        "Write-Host '  MVS Frontend Server' -ForegroundColor Green",
+        "Write-Host '  Hyvision One Frontend Server' -ForegroundColor Green",
         "Write-Host '========================================' -ForegroundColor Green",
         "Set-Location '$frontendPathEscaped'",
-        "Set-Item -Path Env:PORT -Value 3000",
+        "Set-Item -Path Env:PORT -Value 3030",
         "Set-Item -Path Env:BROWSER -Value 'none'",
         "npm start"
     )
     $command = $frontendCmds -join "; "
 
     Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoExit", "-Command", $command)
-    Write-ColorOutput "Frontend server started on port 3000." "Green"
+    Write-ColorOutput "Frontend server started on port 3030." "Green"
 }
 
 try {
@@ -255,12 +257,12 @@ try {
     Write-ColorOutput "`nURLs:" "Cyan"
 
     if (-not $FrontendOnly) {
-        Write-ColorOutput "  Frontend: http://localhost:3000" "White"
+        Write-ColorOutput "  Frontend: http://localhost:3030" "White"
     }
     if (-not $BackendOnly) {
-        Write-ColorOutput "  Backend API: http://localhost:5000" "White"
-        Write-ColorOutput "  Health check: http://localhost:5000/health" "White"
-        Write-ColorOutput "  API docs: http://localhost:5000/api" "White"
+        Write-ColorOutput "  Backend API: http://localhost:5030" "White"
+        Write-ColorOutput "  Health check: http://localhost:5030/health" "White"
+        Write-ColorOutput "  API docs: http://localhost:5030/api" "White"
     }
 
     Write-ColorOutput "`nTest accounts:" "Cyan"

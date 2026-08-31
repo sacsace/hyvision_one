@@ -11,6 +11,6 @@ Static booking website starter for the Lotus Korean Hotel brand.
 Deploy this folder to the domain `hotellotus.in`.
 
 Recommended next steps:
-- Connect the booking form to MVS public booking APIs.
+- Connect the booking form to Hyvision One public booking APIs.
 - Replace placeholder contact details.
 - Add room images and pricing.

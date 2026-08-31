@@ -6,19 +6,19 @@
 
 #### 프론트엔드 URL 확인
 1. Railway 대시보드 접속: https://railway.app
-2. **mvs-3.0** 프로젝트 선택
-3. **mvs-frontend** 서비스 클릭
+2. **hyvision-one** 프로젝트 선택
+3. **hvo-frontend** 서비스 클릭
 4. **Settings** 탭 클릭
 5. **"Generate Domain"** 버튼 클릭 (도메인이 없다면)
    - 또는 기존 도메인 확인
-   - 예: `https://mvs-frontend-production.up.railway.app`
+   - 예: `https://hvo-frontend-production.up.railway.app`
 
 #### 백엔드 URL 확인
-1. Railway 대시보드 → **mvs-backend** 서비스 클릭
+1. Railway 대시보드 → **hvo-backend** 서비스 클릭
 2. **Settings** 탭 클릭
 3. **"Generate Domain"** 버튼 클릭 (도메인이 없다면)
    - 또는 기존 도메인 확인
-   - 예: `https://mvs-backend-production.up.railway.app`
+   - 예: `https://hvo-backend-production.up.railway.app`
 
 ---
 
@@ -175,7 +175,7 @@ https://your-backend-url.railway.app/api/health
    - Railway 대시보드에서 "Online" 상태인지
 
 2. 백엔드 로그 확인
-   - Railway 대시보드 → mvs-backend → Deployments → Logs
+   - Railway 대시보드 → hvo-backend → Deployments → Logs
    - 데이터베이스 연결 오류 메시지 확인
 
 3. 마이그레이션 실행 여부 확인
@@ -189,22 +189,22 @@ https://your-backend-url.railway.app/api/health
 
 **프론트엔드:**
 ```
-https://mvs-frontend-production.up.railway.app
+https://hvo-frontend-production.up.railway.app
 ```
 
 **백엔드:**
 ```
-https://mvs-backend-production.up.railway.app
+https://hvo-backend-production.up.railway.app
 ```
 
 **백엔드 헬스체크:**
 ```
-https://mvs-backend-production.up.railway.app/health
+https://hvo-backend-production.up.railway.app/health
 ```
 
 **백엔드 API:**
 ```
-https://mvs-backend-production.up.railway.app/api
+https://hvo-backend-production.up.railway.app/api
 ```
 
 ---

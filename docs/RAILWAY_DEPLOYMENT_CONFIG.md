@@ -3,16 +3,16 @@
 ## 🚂 Railway 서비스 구성
 
 ### 1. 백엔드 서비스 (API)
-- **서비스명**: `mvs-backend`
-- **Root Directory**: `msv-server`
-- **도메인**: `api.mvsystem.in`
+- **서비스명**: `hvo-backend`
+- **Root Directory**: `hvo-server`
+- **도메인**: `api.hvoystem.in`
 - **포트**: Railway 자동 할당
 - **환경변수**: `env.railway` 파일 사용
 
 ### 2. 프론트엔드 서비스 (Web)
-- **서비스명**: `mvs-frontend`  
-- **Root Directory**: `msv-frontend`
-- **도메인**: `www.mvsystem.in`
+- **서비스명**: `hvo-frontend`  
+- **Root Directory**: `hvo-frontend`
+- **도메인**: `www.hvoystem.in`
 - **포트**: Railway 자동 할당
 - **환경변수**: `env.railway` 파일 사용
 
@@ -29,13 +29,13 @@ PORT=$PORT
 HOST=0.0.0.0
 DATABASE_URL=$DATABASE_URL
 JWT_SECRET=[생성된 시크릿 키]
-CORS_ORIGIN=https://www.mvsystem.in
+CORS_ORIGIN=https://www.hvoystem.in
 ```
 
 ### 프론트엔드 환경변수
 ```bash
-REACT_APP_API_URL=https://api.mvsystem.in/api
-REACT_APP_WS_URL=wss://api.mvsystem.in
+REACT_APP_API_URL=https://api.hvoystem.in/api
+REACT_APP_WS_URL=wss://api.hvoystem.in
 REACT_APP_ENVIRONMENT=production
 ```
 
@@ -56,8 +56,8 @@ TTL: 300
 
 ### 2. Railway 도메인 연결
 1. Railway 대시보드 → Settings → Domains
-2. `www.mvsystem.in` 추가
-3. `api.mvsystem.in` 추가
+2. `www.hvoystem.in` 추가
+3. `api.hvoystem.in` 추가
 4. DNS 레코드 확인
 
 ## 🔒 SSL 인증서

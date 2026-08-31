@@ -1,7 +1,7 @@
-# MVS Railway 배포 가이드
+# Hyvision One Railway 배포 가이드
 
 ## 개요
-MVS 프로젝트를 Railway 플랫폼에 배포하는 방법을 설명합니다.
+Hyvision One 프로젝트를 Railway 플랫폼에 배포하는 방법을 설명합니다.
 
 ## 배포 구조
 - **Backend**: Node.js/Express API 서버
@@ -18,25 +18,25 @@ MVS 프로젝트를 Railway 플랫폼에 배포하는 방법을 설명합니다.
 
 ### 1.2 프로젝트 생성
 1. "Deploy from GitHub repo" 선택
-2. MVS 저장소 선택
-3. 프로젝트 이름: `mvs-3.0`
+2. Hyvision One 저장소 선택
+3. 프로젝트 이름: `hyvision-one`
 
 ## 2. 백엔드 배포
 
 ### 2.1 백엔드 서비스 생성
 1. Railway 대시보드에서 "New Service" 클릭
 2. "GitHub Repo" 선택
-3. 저장소 선택 후 **Root Directory**를 `msv-server`로 설정
-4. 서비스 이름: `mvs-backend`
+3. 저장소 선택 후 **Root Directory**를 `hvo-server`로 설정
+4. 서비스 이름: `hvo-backend`
 
 ### 2.2 데이터베이스 연결
 1. "Add Database" → "PostgreSQL" 선택
-2. 데이터베이스 이름: `mvs-db`
+2. 데이터베이스 이름: `hvo-db`
 3. 자동으로 `DATABASE_URL` 환경변수 생성됨
 
 ### 2.3 Redis 연결
 1. "Add Database" → "Redis" 선택
-2. Redis 이름: `mvs-redis`
+2. Redis 이름: `hvo-redis`
 3. 자동으로 `REDIS_URL` 환경변수 생성됨
 
 ### 2.4 환경변수 설정
@@ -80,8 +80,8 @@ SMTP_PASS=your-smtp-password
 ### 3.1 프론트엔드 서비스 생성
 1. Railway 대시보드에서 "New Service" 클릭
 2. "GitHub Repo" 선택
-3. 저장소 선택 후 **Root Directory**를 `msv-frontend`로 설정
-4. 서비스 이름: `mvs-frontend`
+3. 저장소 선택 후 **Root Directory**를 `hvo-frontend`로 설정
+4. 서비스 이름: `hvo-frontend`
 
 ### 3.2 환경변수 설정
 ```bash
@@ -152,8 +152,8 @@ GA_TRACKING_ID=your-google-analytics-id
 ### 7.2 로그 확인 방법
 ```bash
 # Railway CLI 사용
-railway logs --service mvs-backend
-railway logs --service mvs-frontend
+railway logs --service hvo-backend
+railway logs --service hvo-frontend
 ```
 
 ## 8. 자동 배포 설정
@@ -212,4 +212,4 @@ railway logs --service mvs-frontend
 - 캐싱 전략 구현
 - 로드 밸런싱 고려
 
-이 가이드를 따라하면 MVS 애플리케이션을 Railway에 성공적으로 배포할 수 있습니다.
+이 가이드를 따라하면 Hyvision One 애플리케이션을 Railway에 성공적으로 배포할 수 있습니다.

@@ -1,4 +1,4 @@
-# MVS Database Schema
+# Hyvision One Database Schema
 
 ## Overview
 MVS은 다중 테넌트(Multi-tenant) 구조의 SaaS 플랫폼으로, 여러 회사가 독립적으로 사용할 수 있는 통합 관리 시스템입니다.

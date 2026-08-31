@@ -38,7 +38,7 @@
 ### 1. Railway 배포 로그 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭 클릭
 3. 최신 배포의 **"View Logs"** 클릭
 4. 다음을 확인:
@@ -94,7 +94,7 @@ Serving!
   │                                         │
   │   Serving!                              │
   │                                         │
-  │   - Local:    http://localhost:3000    │
+  │   - Local:    http://localhost:3010    │
   │   - Network:  http://0.0.0.0:3000      │
   │                                         │
   └─────────────────────────────────────────┘
@@ -154,7 +154,7 @@ Error: listen EADDRINUSE: address already in use :::3000
 2. **시작 로그:**
    ```
    Serving!
-   - Local:    http://localhost:3000
+   - Local:    http://localhost:3010
    ```
 
 3. **브라우저 접속:**

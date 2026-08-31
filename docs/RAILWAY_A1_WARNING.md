@@ -53,7 +53,7 @@
 ### 1단계: 배포 로그 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭 (이미 열려있음)
 3. 최신 배포의 **"View logs"** 버튼 클릭
 4. 다음 확인:
@@ -62,7 +62,7 @@
 ```
 [start]
 Serving!
-- Local:    http://localhost:3000
+- Local:    http://localhost:3010
 - Network:  http://0.0.0.0:3000
 ```
 
@@ -81,7 +81,7 @@ Port 3000 is already in use
 ### 2단계: 런타임 로그 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭
 3. 최신 배포의 **"..." 메뉴** (세로 점 3개) 클릭
 4. **"View Logs"** 또는 **"Runtime Logs"** 클릭
@@ -92,7 +92,7 @@ Port 3000 is already in use
 ### 3단계: Metrics 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Metrics** 탭 클릭
 3. 다음 확인:
    - CPU 사용량
@@ -132,7 +132,7 @@ Port 3000 is already in use
 ### 방법 1: 배포 로그 확인 (우선)
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭
 3. 최신 배포의 **"View logs"** 클릭
 4. 오류 메시지 확인
@@ -147,7 +147,7 @@ Port 3000 is already in use
 ### 방법 2: 런타임 로그 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Deployments** 탭
 3. 최신 배포의 **"..." 메뉴** 클릭
 4. **"View Logs"** 클릭
@@ -158,7 +158,7 @@ Port 3000 is already in use
 ### 방법 3: 환경 변수 확인
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Variables** 탭 클릭
 3. 다음 확인:
    - `REACT_APP_API_URL`이 설정되어 있는지
@@ -169,7 +169,7 @@ Port 3000 is already in use
 2. 다음 설정:
    ```
    Name: REACT_APP_API_URL
-   Value: https://mvs-backend-production.up.railway.app/api
+   Value: https://hvo-backend-production.up.railway.app/api
    ```
    (실제 백엔드 URL로 변경)
 3. **Save** 클릭
@@ -230,7 +230,7 @@ Port 3000 is already in use
 **해결:**
 1. 배포 로그 확인
 2. 빌드 단계가 성공했는지 확인
-3. Root Directory 설정 확인 (`msv-frontend`)
+3. Root Directory 설정 확인 (`hvo-frontend`)
 
 ---
 

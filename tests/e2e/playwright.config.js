@@ -1,4 +1,4 @@
-// MVS E2E 테스트 설정 (Playwright)
+// Hyvision One E2E 테스트 설정 (Playwright)
 
 const { defineConfig, devices } = require('@playwright/test');
 
@@ -14,7 +14,7 @@ module.exports = defineConfig({
     ['junit', { outputFile: 'test-results/results.xml' }]
   ],
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3030',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -43,7 +43,7 @@ module.exports = defineConfig({
   ],
   webServer: {
     command: 'docker-compose up -d',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:3030',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

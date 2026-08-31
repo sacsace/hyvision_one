@@ -1,0 +1,16 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "node scripts/serve-production.cjs"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+[env]
+NODE_ENV = "production"
+PORT = "$PORT"
+CI = "false"
+CANONICAL_HOST = "www.hvoystem.in"
+FORCE_HTTPS = "1"

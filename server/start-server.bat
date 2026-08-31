@@ -1,10 +1,10 @@
 @echo off
-REM MVS 서버 시작 배치 파일 (Windows)
+REM Hyvision One 서버 시작 배치 파일 (Windows)
 REM PowerShell 스크립트를 실행합니다
 
 chcp 65001 >nul
 echo.
-echo 🚀 MVS 서버 시작
+echo 🚀 Hyvision One 서버 시작
 echo ====================================
 echo.
 

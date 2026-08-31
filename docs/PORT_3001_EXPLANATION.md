@@ -5,13 +5,13 @@
 ### 1. CORS 설정에서 사용 (백엔드)
 
 **위치:**
-- `msv-server/env.development`
-- `msv-server/src/index.ts`
-- `msv-server/src/config/constants.ts`
+- `hvo-server/env.development`
+- `hvo-server/src/index.ts`
+- `hvo-server/src/config/constants.ts`
 
 **설정:**
 ```typescript
-CORS_ORIGIN=http://localhost:3000,http://localhost:3001,http://localhost:3002
+CORS_ORIGIN=http://localhost:3010,http://localhost:3001,http://localhost:3002
 ```
 
 **의미:**
@@ -37,7 +37,7 @@ npm start
 # React가 자동으로 3001 포트 사용
 Compiled successfully!
 
-You can now view msv-frontend in the browser.
+You can now view hvo-frontend in the browser.
 
   Local:            http://localhost:3001
   On Your Network:  http://192.168.0.109:3001
@@ -55,7 +55,7 @@ You can now view msv-frontend in the browser.
 **백엔드 CORS 설정:**
 ```typescript
 // 개발 환경 기본값
-return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
+return ['http://localhost:3010', 'http://localhost:3001', 'http://localhost:3002'];
 ```
 
 **의미:**
@@ -98,7 +98,7 @@ return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002
 - API URL이 `http://localhost:3001/api`로 잘못 결정됨
 
 **3. 올바른 동작**
-- localhost인 경우 코드가 `http://localhost:5000/api`를 사용해야 함
+- localhost인 경우 코드가 `http://localhost:5010/api`를 사용해야 함
 - 하지만 환경 변수가 없어서 도메인 로직으로 넘어감
 
 ---
@@ -108,13 +108,13 @@ return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002
 ### 방법 1: 환경 변수 파일 확인
 
 **확인:**
-- `msv-frontend/.env.development` 파일이 있는지
-- `REACT_APP_API_URL=http://localhost:5000/api` 설정이 있는지
+- `hvo-frontend/.env.development` 파일이 있는지
+- `REACT_APP_API_URL=http://localhost:5010/api` 설정이 있는지
 
 **재시작:**
 ```bash
 # 프론트엔드 서버 재시작
-cd msv-frontend
+cd hvo-frontend
 npm start
 ```
 
@@ -126,7 +126,7 @@ npm start
 ```javascript
 // 다음 메시지 확인:
 📍 현재 위치: { protocol: 'http:', hostname: 'localhost', port: '3001' }
-🏠 localhost 감지, API URL: http://localhost:5000/api  // ✅ 정상
+🏠 localhost 감지, API URL: http://localhost:5010/api  // ✅ 정상
 ```
 
 **문제가 있는 경우:**
@@ -149,7 +149,7 @@ npm start
 **현재 오류:**
 - 프론트엔드가 3001 포트에서 실행 중
 - API URL이 잘못 결정되어 `localhost:3001/api`로 호출
-- 올바른 API URL: `localhost:5000/api`
+- 올바른 API URL: `localhost:5010/api`
 
 **해결:**
 - `.env.development` 파일 확인

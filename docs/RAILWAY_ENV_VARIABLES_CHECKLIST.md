@@ -2,7 +2,7 @@
 
 ## 📋 현재 설정 상태
 
-### mvs-backend (백엔드) - 현재 9개 변수 설정됨
+### hvo-backend (백엔드) - 현재 9개 변수 설정됨
 
 #### ✅ 이미 설정된 변수들
 1. `CORS_ORIGIN` - CORS 허용 도메인
@@ -44,12 +44,12 @@
 
 ---
 
-### mvs-frontend (프론트엔드) - 확인 필요
+### hvo-frontend (프론트엔드) - 확인 필요
 
 #### 🔴 필수 변수
 1. **`REACT_APP_API_URL`**
    - 값: `https://your-backend-url.railway.app/api`
-   - 예시: `https://mvs-backend-production.up.railway.app/api`
+   - 예시: `https://hvo-backend-production.up.railway.app/api`
    - 용도: 백엔드 API URL
    - 중요도: ⭐⭐⭐⭐⭐
 
@@ -69,7 +69,7 @@
 
 ### 1. SESSION_SECRET 추가 (필수)
 
-Railway 대시보드 → mvs-backend → Variables → New Variable
+Railway 대시보드 → hvo-backend → Variables → New Variable
 
 ```
 Name: SESSION_SECRET
@@ -85,7 +85,7 @@ Value: 0.0.0.0
 
 ### 3. 프론트엔드 REACT_APP_API_URL 설정
 
-Railway 대시보드 → mvs-frontend → Variables → New Variable
+Railway 대시보드 → hvo-frontend → Variables → New Variable
 
 ```
 Name: REACT_APP_API_URL
@@ -93,16 +93,16 @@ Value: https://your-backend-url.railway.app/api
 ```
 
 **백엔드 URL 확인 방법:**
-1. Railway 대시보드 → mvs-backend → Settings
+1. Railway 대시보드 → hvo-backend → Settings
 2. "Generate Domain" 클릭 또는 기존 도메인 확인
-3. 예: `https://mvs-backend-production.up.railway.app`
-4. API URL: `https://mvs-backend-production.up.railway.app/api`
+3. 예: `https://hvo-backend-production.up.railway.app`
+4. API URL: `https://hvo-backend-production.up.railway.app/api`
 
 ---
 
 ## ✅ 설정 완료 체크리스트
 
-### 백엔드 (mvs-backend)
+### 백엔드 (hvo-backend)
 - [x] CORS_ORIGIN
 - [x] DATABASE_URL
 - [x] DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT
@@ -111,7 +111,7 @@ Value: https://your-backend-url.railway.app/api
 - [ ] **SESSION_SECRET** ← 추가 필요!
 - [ ] HOST (권장)
 
-### 프론트엔드 (mvs-frontend)
+### 프론트엔드 (hvo-frontend)
 - [ ] **REACT_APP_API_URL** ← 추가 필요!
 - [ ] NODE_ENV (권장)
 - [ ] CI (권장)
@@ -121,7 +121,7 @@ Value: https://your-backend-url.railway.app/api
 ## 🔒 보안 확인 사항
 
 ### ✅ 확인해야 할 것들
-1. **JWT_SECRET**이 기본값(`mvs-jwt-secret`)이 아닌지 확인
+1. **JWT_SECRET**이 기본값(`hvo-jwt-secret`)이 아닌지 확인
    - 현재 설정된 값이 64자 hex 문자열인지 확인
    
 2. **SESSION_SECRET**이 설정되어 있는지 확인
@@ -161,7 +161,7 @@ Value: https://your-backend-url.railway.app/api
 ### 변수 참조 방법
 Railway에서는 다른 서비스의 변수를 참조할 수 있습니다:
 ```
-REACT_APP_API_URL=${{mvs-backend.RAILWAY_PUBLIC_DOMAIN}}/api
+REACT_APP_API_URL=${{hvo-backend.RAILWAY_PUBLIC_DOMAIN}}/api
 ```
 
 이 방법을 사용하면 백엔드 URL이 변경되어도 자동으로 업데이트됩니다.

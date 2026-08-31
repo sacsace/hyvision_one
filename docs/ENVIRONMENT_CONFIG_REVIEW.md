@@ -2,12 +2,12 @@
 
 ## 🔍 현재 환경 설정 상태
 
-### 프론트엔드 API URL 설정 (`msv-frontend/src/services/api.ts`)
+### 프론트엔드 API URL 설정 (`hvo-frontend/src/services/api.ts`)
 
 **코드 로직:**
 1. **환경 변수 우선** (`REACT_APP_API_URL`)
 2. **IP 주소인 경우**: `http://${hostname}:5000/api`
-3. **localhost인 경우**: `http://localhost:5000/api`
+3. **localhost인 경우**: `http://localhost:5010/api`
 4. **도메인인 경우**: `${protocol}//${hostname}${apiPort}/api` ⚠️ **문제 발견!**
 
 ---
@@ -23,35 +23,35 @@ const apiUrl = `${protocol}//${hostname}${apiPort}/api`;
 ```
 
 **의미:**
-- Railway에서 프론트엔드가 `https://mvs-frontend.railway.app:3001` (또는 다른 포트)로 실행되면
+- Railway에서 프론트엔드가 `https://hvo-frontend.railway.app:3001` (또는 다른 포트)로 실행되면
 - `window.location.port`가 `3001`이 됨
-- API URL이 `https://mvs-frontend.railway.app:3001/api`가 됨
+- API URL이 `https://hvo-frontend.railway.app:3001/api`가 됨
 - 하지만 백엔드는 별도 서비스이므로 이 URL은 작동하지 않음
 
 ---
 
 ## 📊 환경 변수 파일 확인
 
-### 프론트엔드 (`msv-frontend/env.development`)
+### 프론트엔드 (`hvo-frontend/env.development`)
 ```bash
-REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=http://localhost:5010/api
 ```
 
-### 프론트엔드 (`msv-frontend/env.railway`)
+### 프론트엔드 (`hvo-frontend/env.railway`)
 ```bash
-REACT_APP_API_URL=https://api.mvsystem.in/api
+REACT_APP_API_URL=https://api.hvoystem.in/api
 ```
 
-### 백엔드 (`msv-server/env.development`)
+### 백엔드 (`hvo-server/env.development`)
 ```bash
-PORT=5000
-CORS_ORIGIN=http://localhost:3000,http://localhost:3001,http://localhost:3002
+PORT=5010
+CORS_ORIGIN=http://localhost:3010,http://localhost:3001,http://localhost:3002
 ```
 
-### 백엔드 (`msv-server/env.railway`)
+### 백엔드 (`hvo-server/env.railway`)
 ```bash
 PORT=$PORT  # Railway가 자동 설정
-CORS_ORIGIN=https://www.mvsystem.in
+CORS_ORIGIN=https://www.hvoystem.in
 ```
 
 ---
@@ -61,14 +61,14 @@ CORS_ORIGIN=https://www.mvsystem.in
 ### 시나리오 1: Railway 배포 환경
 
 1. **프론트엔드가 Railway에서 실행 중**
-   - URL: `https://mvs-frontend.railway.app` (또는 다른 포트)
+   - URL: `https://hvo-frontend.railway.app` (또는 다른 포트)
    - `window.location.port`가 `3001` 또는 다른 값
 
 2. **코드 실행 흐름:**
    - `REACT_APP_API_URL` 환경 변수가 설정되지 않음 (빌드 시점)
    - `hostname`이 도메인 (localhost가 아님)
    - `window.location.port`가 `3001`
-   - API URL: `https://mvs-frontend.railway.app:3001/api` ❌
+   - API URL: `https://hvo-frontend.railway.app:3001/api` ❌
 
 3. **결과:**
    - 프론트엔드가 자신의 포트로 API를 호출
@@ -85,7 +85,7 @@ CORS_ORIGIN=https://www.mvsystem.in
 
 2. **코드 실행 흐름:**
    - `hostname === 'localhost'` 조건 충족
-   - API URL: `http://localhost:5000/api` ✅
+   - API URL: `http://localhost:5010/api` ✅
 
 3. **결과:**
    - 정상 작동 (localhost는 항상 5000 포트 사용)
@@ -97,13 +97,13 @@ CORS_ORIGIN=https://www.mvsystem.in
 ### 방법 1: 환경 변수 설정 (권장)
 
 **Railway 대시보드에서:**
-1. **mvs-frontend** 서비스 선택
+1. **hvo-frontend** 서비스 선택
 2. **Variables** 탭 클릭
 3. **New Variable** 클릭
 4. 다음 설정:
    ```
    Name: REACT_APP_API_URL
-   Value: https://mvs-backend-production.up.railway.app/api
+   Value: https://hvo-backend-production.up.railway.app/api
    ```
    (실제 백엔드 URL로 변경)
 5. **Save** 클릭
@@ -130,7 +130,7 @@ CORS_ORIGIN=https://www.mvsystem.in
 if (hostname.includes('railway.app') || hostname.includes('railway.com')) {
   // Railway 환경에서는 환경 변수 필수
   console.error('⚠️ Railway 환경에서는 REACT_APP_API_URL 환경 변수가 필수입니다.');
-  return 'http://localhost:5000/api'; // 기본값 (작동하지 않음)
+  return 'http://localhost:5010/api'; // 기본값 (작동하지 않음)
 }
 // 같은 호스트의 /api 경로 사용 (프론트엔드와 백엔드가 같은 도메인)
 const apiPort = port ? `:${port}` : '';
@@ -150,7 +150,7 @@ const apiUrl = `${protocol}//${hostname}${apiPort}/api`;
 - **Railway**: `$PORT` (Railway가 자동 설정, 보통 5000 또는 다른 값)
 
 ### 프론트엔드 API URL
-- **개발**: `http://localhost:5000/api` (고정)
+- **개발**: `http://localhost:5010/api` (고정)
 - **Railway**: 환경 변수 필요 (`REACT_APP_API_URL`)
 
 ### 문제점
@@ -181,7 +181,7 @@ const apiUrl = `${protocol}//${hostname}${apiPort}/api`;
 1. Railway에서 `REACT_APP_API_URL` 환경 변수가 설정되지 않음
 2. 코드가 도메인 기반 로직을 사용
 3. `window.location.port`가 `3001` (또는 다른 값)
-4. API URL이 `https://mvs-frontend.railway.app:3001/api`가 됨
+4. API URL이 `https://hvo-frontend.railway.app:3001/api`가 됨
 5. 백엔드는 별도 서비스이므로 연결 실패
 
 **해결:**

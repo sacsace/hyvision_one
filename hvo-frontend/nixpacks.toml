@@ -1,0 +1,42 @@
+# Hyvision One Frontend - Nixpacks 설정 파일
+# 프론트엔드 전용 Railway 배포 설정
+
+[phases.setup]
+# Node.js 런타임 설치
+# npm은 nodejs에 포함됨 — 별도 nixPkgs 'npm'은 Nixpacks 1.41+에서 빌드 실패
+nixPkgs = ["nodejs"]
+
+[phases.install]
+# 의존성 설치 (빌드를 위해 모든 의존성 필요)
+cmds = ["npm ci"]
+
+[phases.build]
+# React 앱 빌드 (CI=false로 설정하여 경고를 오류로 처리하지 않음)
+# Railway가 자동으로 CI=true를 설정하므로, 빌드 전에 제거하고 false로 설정
+# REACT_APP_API_URL은 Railway 환경 변수에서 가져오거나 기본값 사용
+# 주의: Railway 대시보드에서 REACT_APP_API_URL 환경 변수를 설정해야 함
+cmds = [
+  "unset CI",
+  "export CI=false",
+  "export GENERATE_SOURCEMAP=false",
+  "export REACT_APP_API_URL=${REACT_APP_API_URL:-https://hvo-backend-production.up.railway.app/api}",
+  "npm run build"
+]
+
+[start]
+# 보안 헤더·HTTPS 리다이렉트·민감 경로 차단 포함 프로덕션 서버
+# npm run 래퍼 없이 node 직접 기동 (production npm warn / SIGTERM 오탐 감소)
+cmd = "node scripts/serve-production.cjs"
+
+# 환경 변수 설정
+[env]
+NODE_ENV = "production"
+PORT = "$PORT"
+CI = "false"
+REACT_APP_API_URL = "https://api.hvoystem.in/api"
+CANONICAL_HOST = "www.hvoystem.in"
+FORCE_HTTPS = "1"
+
+# 변수 설정
+[variables]
+NODE_ENV = "production"

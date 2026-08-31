@@ -45,9 +45,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: mvs
-      POSTGRES_USER: mvs_user
-      POSTGRES_PASSWORD: mvs_password
+      POSTGRES_DB: hvo
+      POSTGRES_USER: hvo_user
+      POSTGRES_PASSWORD: hvo_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
 ```

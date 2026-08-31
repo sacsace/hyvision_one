@@ -13,18 +13,18 @@
 
 ### 현재 설정 확인
 
-**프론트엔드 포트 설정 (`msv-frontend/package.json`):**
+**프론트엔드 포트 설정 (`hvo-frontend/package.json`):**
 ```json
-"start": "set PORT=3000 && react-scripts start"
+"start": "set PORT=3010 && react-scripts start"
 ```
 
-**환경 변수 설정 (`msv-frontend/env.development`):**
+**환경 변수 설정 (`hvo-frontend/env.development`):**
 ```bash
-REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=http://localhost:5010/api
 ```
 
-**API URL 로직 (`msv-frontend/src/services/api.ts`):**
-- localhost인 경우: `http://localhost:5000/api` ✅
+**API URL 로직 (`hvo-frontend/src/services/api.ts`):**
+- localhost인 경우: `http://localhost:5010/api` ✅
 
 ---
 
@@ -33,7 +33,7 @@ REACT_APP_API_URL=http://localhost:5000/api
 ### 원인 1: 프론트엔드가 3001 포트에서 실행 중
 
 **상황:**
-- `PORT=3000`으로 설정했지만 3000 포트가 이미 사용 중
+- `PORT=3010`으로 설정했지만 3000 포트가 이미 사용 중
 - React가 자동으로 3001 포트로 변경
 - 프론트엔드가 `localhost:3001`에서 실행됨
 
@@ -42,7 +42,7 @@ REACT_APP_API_URL=http://localhost:5000/api
    ```
    Compiled successfully!
    
-   You can now view msv-frontend in the browser.
+   You can now view hvo-frontend in the browser.
    
      Local:            http://localhost:3001
      On Your Network:  http://192.168.0.109:3001
@@ -72,7 +72,7 @@ REACT_APP_API_URL=http://localhost:5000/api
    ```
    또는
    ```
-   REACT_APP_API_URL: http://localhost:5000/api
+   REACT_APP_API_URL: http://localhost:5010/api
    ```
 
 **해결 방법:**
@@ -89,7 +89,7 @@ REACT_APP_API_URL=http://localhost:5000/api
 
 **확인 방법:**
 1. 백엔드 서버가 실행 중인지 확인
-2. `http://localhost:5000/health` 접속 테스트
+2. `http://localhost:5010/health` 접속 테스트
 3. 터미널에서 백엔드 로그 확인
 
 ---
@@ -99,13 +99,13 @@ REACT_APP_API_URL=http://localhost:5000/api
 ### 방법 1: 환경 변수 파일 이름 변경 (권장)
 
 **현재:**
-- `msv-frontend/env.development` ❌ (React가 인식하지 못함)
+- `hvo-frontend/env.development` ❌ (React가 인식하지 못함)
 
 **변경:**
-- `msv-frontend/.env.development` ✅ (React가 자동 로드)
+- `hvo-frontend/.env.development` ✅ (React가 자동 로드)
 
 **단계:**
-1. `msv-frontend/env.development` 파일을 `.env.development`로 이름 변경
+1. `hvo-frontend/env.development` 파일을 `.env.development`로 이름 변경
 2. 프론트엔드 서버 재시작
 3. 브라우저에서 확인
 
@@ -114,11 +114,11 @@ REACT_APP_API_URL=http://localhost:5000/api
 ### 방법 2: .env 파일 생성
 
 **단계:**
-1. `msv-frontend/.env` 파일 생성
+1. `hvo-frontend/.env` 파일 생성
 2. 다음 내용 추가:
    ```bash
-   REACT_APP_API_URL=http://localhost:5000/api
-   REACT_APP_WS_URL=ws://localhost:5000
+   REACT_APP_API_URL=http://localhost:5010/api
+   REACT_APP_WS_URL=ws://localhost:5010
    ```
 3. 프론트엔드 서버 재시작
 
@@ -129,15 +129,15 @@ REACT_APP_API_URL=http://localhost:5000/api
 **단계:**
 1. 백엔드 서버가 실행 중인지 확인
    ```bash
-   cd msv-server
+   cd hvo-server
    npm run dev
    ```
 
 2. 백엔드가 5000 포트에서 실행 중인지 확인
-   - 터미널 메시지: `Server is running on port 5000`
+   - 터미널 메시지: `Server is running on port 5010`
 
 3. 헬스체크 테스트
-   - 브라우저에서 `http://localhost:5000/health` 접속
+   - 브라우저에서 `http://localhost:5010/health` 접속
    - `{"status":"ok"}` 응답 확인
 
 ---
@@ -148,13 +148,13 @@ REACT_APP_API_URL=http://localhost:5000/api
 
 **터미널에서:**
 ```bash
-cd msv-frontend
+cd hvo-frontend
 npm start
 ```
 
 **확인:**
 - 어떤 포트에서 실행되는지 확인
-- `Local: http://localhost:3000` 또는 `http://localhost:3001`
+- `Local: http://localhost:3010` 또는 `http://localhost:3001`
 
 ---
 
@@ -163,7 +163,7 @@ npm start
 **브라우저 개발자 도구 (F12) → Console 탭:**
 ```javascript
 // 다음 메시지 확인:
-REACT_APP_API_URL: http://localhost:5000/api  // ✅ 정상
+REACT_APP_API_URL: http://localhost:5010/api  // ✅ 정상
 또는
 REACT_APP_API_URL: (not set)  // ❌ 문제
 ```
@@ -175,7 +175,7 @@ REACT_APP_API_URL: (not set)  // ❌ 문제
 **브라우저 개발자 도구 (F12) → Console 탭:**
 ```javascript
 // 다음 메시지 확인:
-🏠 localhost 감지, API URL: http://localhost:5000/api  // ✅ 정상
+🏠 localhost 감지, API URL: http://localhost:5010/api  // ✅ 정상
 또는
 🌍 도메인 감지, API URL: http://localhost:3001/api  // ❌ 문제
 ```
@@ -185,14 +185,14 @@ REACT_APP_API_URL: (not set)  // ❌ 문제
 ## 📋 체크리스트
 
 ### 환경 변수 설정
-- [ ] `msv-frontend/.env.development` 파일 존재 확인
-- [ ] `REACT_APP_API_URL=http://localhost:5000/api` 설정 확인
+- [ ] `hvo-frontend/.env.development` 파일 존재 확인
+- [ ] `REACT_APP_API_URL=http://localhost:5010/api` 설정 확인
 - [ ] 프론트엔드 서버 재시작
 
 ### 백엔드 서버
 - [ ] 백엔드 서버가 실행 중인지 확인
 - [ ] 백엔드가 5000 포트에서 실행 중인지 확인
-- [ ] `http://localhost:5000/health` 접속 테스트
+- [ ] `http://localhost:5010/health` 접속 테스트
 
 ### 프론트엔드
 - [ ] 프론트엔드가 실행 중인지 확인
@@ -206,7 +206,7 @@ REACT_APP_API_URL: (not set)  // ❌ 문제
 ### 1단계: 환경 변수 파일 이름 변경
 
 ```bash
-cd msv-frontend
+cd hvo-frontend
 # Windows PowerShell
 Rename-Item env.development .env.development
 
@@ -226,11 +226,11 @@ npm start
 1. 브라우저 개발자 도구 (F12) → Console 탭
 2. 다음 메시지 확인:
    ```
-   🔧 환경 변수에서 API URL 사용: http://localhost:5000/api
+   🔧 환경 변수에서 API URL 사용: http://localhost:5010/api
    ```
    또는
    ```
-   🏠 localhost 감지, API URL: http://localhost:5000/api
+   🏠 localhost 감지, API URL: http://localhost:5010/api
    ```
 
 ---

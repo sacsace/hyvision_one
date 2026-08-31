@@ -1,4 +1,4 @@
-// MVS 통합 테스트 설정
+// Hyvision One 통합 테스트 설정
 
 const { execSync } = require('child_process');
 const axios = require('axios');
@@ -6,8 +6,8 @@ const { expect } = require('chai');
 
 // 테스트 환경 설정
 const TEST_CONFIG = {
-  baseURL: process.env.TEST_BASE_URL || 'http://localhost:5000',
-  frontendURL: process.env.TEST_FRONTEND_URL || 'http://localhost:3000',
+  baseURL: process.env.TEST_BASE_URL || 'http://localhost:5030',
+  frontendURL: process.env.TEST_FRONTEND_URL || 'http://localhost:3030',
   timeout: 30000,
   retryAttempts: 3,
   retryDelay: 5000
@@ -18,7 +18,7 @@ const TEST_DATA = {
   user: {
     userid: 'testuser',
     username: 'Test User',
-    email: 'test@mvs.local',
+    email: 'test@hvo.local',
     password: 'TestPassword123!',
     role: 'admin',
     department: 'IT',
@@ -111,7 +111,7 @@ class IntegrationTestSuite {
   }
 
   async runAllTests() {
-    console.log('🚀 MVS 통합 테스트 시작\n');
+    console.log('🚀 Hyvision One 통합 테스트 시작\n');
 
     try {
       // 1. 환경 준비
@@ -408,7 +408,7 @@ class IntegrationTestSuite {
   async testPageLoading() {
     const response = await axios.get(TEST_CONFIG.frontendURL, { timeout: 10000 });
     expect(response.status).to.equal(200);
-    expect(response.data).to.include('MVS');
+    expect(response.data).to.include('Hyvision One');
   }
 
   async testRouting() {

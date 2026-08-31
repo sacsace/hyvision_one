@@ -1,4 +1,4 @@
-// MVS E2E 테스트 - 로그인 기능
+// Hyvision One E2E 테스트 - 로그인 기능
 
 const { test, expect } = require('@playwright/test');
 
@@ -8,8 +8,8 @@ test.describe('로그인 기능', () => {
   });
 
   test('로그인 페이지가 정상적으로 로드된다', async ({ page }) => {
-    await expect(page).toHaveTitle(/MVS/);
-    await expect(page.locator('h1')).toContainText('MVS 로그인');
+    await expect(page).toHaveTitle(/Hyvision One/);
+    await expect(page.locator('h1')).toContainText('Hyvision One 로그인');
   });
 
   test('유효한 자격증명으로 로그인할 수 있다', async ({ page }) => {
