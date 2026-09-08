@@ -127,7 +127,6 @@ import HqApprovalRequest from './HqApprovalRequest';
 import HqExportLog from './HqExportLog';
 import HqAccessLog from './HqAccessLog';
 import HqComplianceItem from './HqComplianceItem';
-import HqPrivacySetting from './HqPrivacySetting';
 import HqReportJob from './HqReportJob';
 
 // 관계 설정
@@ -894,7 +893,6 @@ export {
   HqExportLog,
   HqAccessLog,
   HqComplianceItem,
-  HqPrivacySetting,
   HqReportJob,
   connectDB 
 };

@@ -106,7 +106,7 @@ function formatDateTimeExact(value?: string | null) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 }
 
-/** MSV 시스템 로그인 감사 로그 (시스템 설정 탭) */
+/** Hyvision One 시스템 로그인 감사 로그 (시스템 설정 탭) */
 const SystemLoginHistoryTab: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useStore();

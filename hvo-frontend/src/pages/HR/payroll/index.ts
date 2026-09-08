@@ -4,6 +4,8 @@ export {
   computeEsicContributions,
   computeEsicEmployeeFromSumTotal,
   computePfContributions,
+  normalizePfCalcMode,
   payrollRecordToGridRow,
   recalculatePayrollRow
 } from './payrollGridUtils';
+export type { PfCalcMode } from './payrollGridUtils';

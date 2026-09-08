@@ -24,8 +24,6 @@ import {
   listCompliance,
   postCompliance,
   listAccessLogs,
-  getPrivacySettings,
-  putPrivacySettings,
   listHqUsers,
   updateHqUser,
 } from '../controllers/hqController';
@@ -110,20 +108,6 @@ router.get(
   requireHqAccess('reports'),
   requireHqAuditorOrAdmin,
   listAccessLogs
-);
-
-// Privacy
-router.get(
-  '/privacy-settings',
-  requireMenuPermission('/hq/privacy', 'can_view'),
-  requireHqAccess('admin'),
-  getPrivacySettings
-);
-router.put(
-  '/privacy-settings',
-  requireMenuPermission('/hq/privacy', 'can_edit'),
-  requireHqAccess('admin'),
-  putPrivacySettings
 );
 
 // HQ Users (root/admin only)

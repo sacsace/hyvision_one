@@ -245,23 +245,28 @@ export type ComputeProfessionalTaxInput = {
   payrollMonth?: string | null;
 };
 
+/** 지급합계가 이 금액을 초과할 때만 PT 차감 (정확히 25,000이면 0) */
+export const PT_GROSS_THRESHOLD_INR = 25000;
+
 /** 주별 PT 월액 (미등록·면제 주는 0) */
 export function computeProfessionalTaxByState(input: ComputeProfessionalTaxInput): number {
   const gross = Math.max(0, Number(input.grossMonthly) || 0);
+  if (gross <= PT_GROSS_THRESHOLD_INR) return 0;
+
   const code = normalizeIndianStateCode(input.stateCode);
   if (!code || PT_EXEMPT_STATE_CODES.has(code)) return 0;
 
   const slabs = STATE_PT_SLABS[code];
   if (!slabs) {
-    // 알 수 없는 주: 기존 단순 규칙(25,000 이상 200) 폴백
-    return gross >= 25000 ? 200 : 0;
+    // 알 수 없는 주: 25,000 초과 시 200
+    return 200;
   }
 
   let amount = lookupSlabAmount(gross, slabs);
 
   const month = String(input.payrollMonth ?? '').trim();
   const monthNum = /^(\d{4})-(\d{2})/.exec(month)?.[2];
-  if (code === '27' && monthNum === '02' && gross >= 10001) {
+  if (code === '27' && monthNum === '02' && gross > 10000) {
     amount = 300;
   }
 

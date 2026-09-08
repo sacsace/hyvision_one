@@ -3,7 +3,6 @@ import { Op } from 'sequelize';
 import {
   HqAccessLog,
   HqComplianceItem,
-  HqPrivacySetting,
   HqApprovalPolicy,
   MfgHqReportSnapshot,
   User,
@@ -305,39 +304,6 @@ export const listAccessLogs = async (req: RequestWithUser, res: Response) => {
     res.json({ success: true, data: rows.map(decRow) });
   } catch (error) {
     handleError(res, error, 'listAccessLogs');
-  }
-};
-
-// ── Privacy Settings ──
-
-export const getPrivacySettings = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { tenantId } = resolveCompanyScope(req);
-    const [row] = await (HqPrivacySetting as any).findOrCreate({
-      where: { tenant_id: tenantId },
-      defaults: { tenant_id: tenantId },
-    });
-    res.json({ success: true, data: decRow(row) });
-  } catch (error) {
-    handleError(res, error, 'getPrivacySettings');
-  }
-};
-
-export const putPrivacySettings = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { tenantId } = resolveCompanyScope(req);
-    const [row] = await (HqPrivacySetting as any).findOrCreate({
-      where: { tenant_id: tenantId },
-      defaults: { tenant_id: tenantId },
-    });
-    const patch: Record<string, unknown> = {};
-    for (const key of ['purpose', 'retention_days', 'cross_border_allowed', 'legal_basis', 'contact_email', 'meta']) {
-      if (req.body?.[key] !== undefined) patch[key] = req.body[key];
-    }
-    await row.update(patch);
-    res.json({ success: true, data: decRow(row) });
-  } catch (error) {
-    handleError(res, error, 'putPrivacySettings');
   }
 };
 

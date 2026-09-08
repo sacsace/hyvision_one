@@ -67,3 +67,30 @@ export function ensureUploadSubdir(...parts: string[]): string {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
+
+/**
+ * 저장된 pdf_path가 깨져도 `/uploads/...` URL로 디스크 경로를 재해석한다.
+ */
+export function resolveStoredUploadPath(
+  pdfPath?: string | null,
+  pdfUrl?: string | null
+): string | null {
+  const abs = String(pdfPath || '').trim();
+  if (abs && fs.existsSync(abs)) return abs;
+
+  const url = String(pdfUrl || abs || '')
+    .trim()
+    .replace(/\\/g, '/');
+  const match = url.match(/\/uploads\/(.+)$/i) || url.match(/^uploads\/(.+)$/i);
+  if (!match?.[1]) return abs && fs.existsSync(abs) ? abs : null;
+
+  const candidate = path.join(getUploadRoot(), ...match[1].split('/').filter(Boolean));
+  if (fs.existsSync(candidate)) return candidate;
+  return null;
+}
+
+/** PDF 매직 헤더(%PDF) 확인 */
+export function bufferLooksLikePdf(buf: Buffer): boolean {
+  if (!buf || buf.length < 5) return false;
+  return buf.subarray(0, 5).toString('utf8') === '%PDF-';
+}

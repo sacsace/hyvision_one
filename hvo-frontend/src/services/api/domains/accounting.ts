@@ -580,7 +580,7 @@ export const accountingService = {
     return response.data;
   },
 
-  /** Tally Export → MSV GL (draft vouchers; never auto-posts) */
+  /** Tally Export → HVO GL (draft vouchers; never auto-posts) */
   importTallyExport: async (
     formData: FormData,
     companyId?: number

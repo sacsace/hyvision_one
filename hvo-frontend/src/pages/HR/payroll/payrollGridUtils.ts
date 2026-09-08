@@ -195,7 +195,7 @@ function mergeOtHours(day: unknown, night: unknown): number {
   return roundOtHour(Math.max(0, num(day)) + Math.max(0, num(night)));
 }
 
-/** extra_fields·직원 정보의 OT 적용 대상 여부 (기본: 적용) */
+/** extra_fields·직원 정보의 OT 적용 대상 여부 (기본: 미적용). 인사정보 우선. */
 export function isOtEligible(
   extra?: Record<string, unknown> | null,
   employee?: Record<string, unknown> | null
@@ -205,11 +205,11 @@ export function isOtEligible(
     if (value === false || value === 'false' || value === 0 || value === '0') return false;
     return null;
   };
-  const fromExtra = extra ? parse(extra.ot_eligible) : null;
-  if (fromExtra !== null) return fromExtra;
   const fromEmployee = employee ? parse(employee.ot_eligible) : null;
   if (fromEmployee !== null) return fromEmployee;
-  return true;
+  const fromExtra = extra ? parse(extra.ot_eligible) : null;
+  if (fromExtra !== null) return fromExtra;
+  return false;
 }
 
 /** 수동 OT 입력 플래그 (extra_fields.ot_manual) */
@@ -229,7 +229,7 @@ function resolveOtInputsFromExtra(
   x: Record<string, unknown>,
   basic: number,
   overtimePayFromApi: number,
-  otEligible = true,
+  otEligible = false,
   otManual = false
 ): { ot_rate: number; day_ot_hour: number; night_ot_hour: number } {
   const defaultRate = basic > 0 ? defaultOtRateFromBasic(basic) : 0;
@@ -351,22 +351,53 @@ function resolveOtInputsFromExtra(
   };
 }
 
-export type PfMode = 'basic_12pct' | 'gross_6pct' | 'epf_12pct_half';
+export type PfCalcMode = 'cap_1800' | 'basic_12pct' | 'total_12pct';
 
-/** PF 직원·사업주 = ROUND(MIN(Basic Salary × 12%, 1,800), 0) — 엑셀 K9 기준 */
+/** @deprecated use PfCalcMode */
+export type PfMode = PfCalcMode | 'gross_6pct' | 'epf_12pct_half';
+
+export function normalizePfCalcMode(raw: unknown): PfCalcMode {
+  const v = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (v === 'basic_12pct') return 'basic_12pct';
+  if (v === 'total_12pct' || v === 'gross_6pct') return 'total_12pct';
+  if (v === 'cap_1800' || v === 'epf_12pct_half') return 'cap_1800';
+  return 'cap_1800';
+}
+
+/** PF — 모드별 직원·사업주 */
 export function computePfContributions(
-  basicSalary: number
+  basicSalary: number,
+  mode: PfCalcMode | string = 'cap_1800',
+  totalSalary = 0
 ): { pf_employee: number; pf_employer: number } {
   const basic = Math.max(0, num(basicSalary));
+  const total = Math.max(0, num(totalSalary));
+  const m = normalizePfCalcMode(mode);
+  if (m === 'basic_12pct') {
+    const amount = Math.round(basic * PF_BASIC_RATE);
+    return { pf_employee: amount, pf_employer: amount };
+  }
+  if (m === 'total_12pct') {
+    const packageBase = total > 0 ? total : basic;
+    const totalPf = Math.round(packageBase * PF_BASIC_RATE);
+    const employee = Math.round(totalPf / 2);
+    return { pf_employee: employee, pf_employer: totalPf - employee };
+  }
   const amount = Math.round(Math.min(basic * PF_BASIC_RATE, PF_CAP_INR));
   return { pf_employee: amount, pf_employer: amount };
 }
 
-function resolvePfModeFromExtra(x: Record<string, unknown>): PfMode {
-  const raw = String(x.indian_pf_mode ?? '').trim();
-  if (raw === 'gross_6pct') return 'gross_6pct';
-  if (raw === 'epf_12pct_half') return 'epf_12pct_half';
-  return 'basic_12pct';
+/** 인사정보 pf_calc_mode 우선, 없으면 extra 스냅샷 */
+function resolvePfModeFromExtra(
+  x: Record<string, unknown>,
+  employee?: Record<string, unknown> | null
+): PfCalcMode {
+  if (employee) {
+    return normalizePfCalcMode(employee.pf_calc_mode ?? employee.indian_pf_mode ?? 'cap_1800');
+  }
+  return normalizePfCalcMode(x.pf_calc_mode ?? x.indian_pf_mode ?? 'cap_1800');
 }
 
 /**
@@ -531,7 +562,7 @@ export function recalculatePayrollRow(
   const days_worked = String(worked);
 
   const otRate = basic > 0 ? defaultOtRateFromBasic(basic) : 0;
-  const otEligible = row.ot_eligible !== false;
+  const otEligible = row.ot_eligible === true;
   const otManual = Boolean(row.ot_manual);
   const applyOt = shouldApplyOtPay(otEligible, otManual);
   const dayOtHour = applyOt ? roundOtHour(num(row.day_ot_hour)) : 0;
@@ -543,7 +574,8 @@ export function recalculatePayrollRow(
   const proratedPackage = roundInr((totalSalary * worked) / calendarDays);
   const sum_total = roundInr(proratedPackage + overtime + transport + customSum);
 
-  const pf = computePfContributions(basic);
+  const pfMode = normalizePfCalcMode(row.pf_calc_mode ?? row.indian_pf_mode ?? 'cap_1800');
+  const pf = computePfContributions(basic, pfMode, totalSalary);
   const pfEmployeeStr = String(pf.pf_employee);
   const pfEmployerStr = String(pf.pf_employer);
 
@@ -579,6 +611,8 @@ export function recalculatePayrollRow(
     ot_manual: otManual && dayOtHour > 0,
     overtime,
     sum_total,
+    pf_calc_mode: pfMode,
+    indian_pf_mode: pfMode,
     pf_employee: pfEmployeeStr,
     pf_employer: pfEmployerStr,
     esic_employee: esicEmployeeStr,
@@ -761,7 +795,7 @@ export function payrollRecordToGridRow(
     otManual
   );
   const transport = num(ex(x, 'transport_allowance'));
-  const indianPfMode = resolvePfModeFromExtra(x);
+  const indianPfMode = resolvePfModeFromExtra(x, emp);
   const customRaw = x.custom_allowances;
   const custom_allowances: Record<string, number> = {};
   if (customRaw && typeof customRaw === 'object' && !Array.isArray(customRaw)) {
@@ -776,9 +810,9 @@ export function payrollRecordToGridRow(
     id: p.id,
     row_no: index + 1,
     emp_id: ex(x, 'emp_id') || str(emp.employee_number),
-    bank_account: ex(x, 'bank_account'),
-    ifsc: ex(x, 'ifsc'),
-    bank_name: ex(x, 'bank_name'),
+    bank_account: ex(x, 'bank_account') || str(emp.bank_account),
+    ifsc: ex(x, 'ifsc') || str(emp.bank_ifsc),
+    bank_name: ex(x, 'bank_name') || str(emp.bank_name),
     employee_email: str(emp.email),
     department: ex(x, 'department') || str(emp.department),
     employee_name: ex(x, 'employee_name') || str(emp.username),
@@ -804,6 +838,7 @@ export function payrollRecordToGridRow(
     transport_allowance: transport,
     overtime: 0,
     sum_total: num(p.gross_salary),
+    pf_calc_mode: indianPfMode,
     indian_pf_mode: indianPfMode,
     pf_employee: '',
     pf_employer: '',
@@ -853,7 +888,7 @@ export function gridRowToPayload(
     ot_rate: recalculated.ot_rate,
     day_ot_hour: recalculated.day_ot_hour,
     night_ot_hour: 0,
-    ot_eligible: recalculated.ot_eligible !== false,
+    ot_eligible: recalculated.ot_eligible === true,
     ot_manual: Boolean(recalculated.ot_manual),
     day_ot: otPay.day_ot_pay,
     night_ot: 0,
@@ -863,7 +898,8 @@ export function gridRowToPayload(
     esic_employee: recalculated.esic_employee,
     esic_employer: recalculated.esic_employer,
     pt: recalculated.pt,
-    indian_pf_mode: recalculated.indian_pf_mode ?? 'basic_12pct'
+    pf_calc_mode: recalculated.pf_calc_mode ?? recalculated.indian_pf_mode ?? 'cap_1800',
+    indian_pf_mode: recalculated.pf_calc_mode ?? recalculated.indian_pf_mode ?? 'cap_1800'
   };
 
   return {

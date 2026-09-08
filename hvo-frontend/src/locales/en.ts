@@ -501,6 +501,10 @@ export default {
       otEligible: 'Eligible for OT',
       otEligibleYes: 'Yes',
       otEligibleNo: 'No',
+      pfCalcMode: 'PF calculation',
+      pfCalcModeCap1800: 'Cap 1,800',
+      pfCalcModeBasic12: 'Basic × 12%',
+      pfCalcModeTotal12: 'Total salary × 12%',
       careerHint: 'Add previous work experience. Only rows with a company name are saved.',
       careerCompany: 'Company',
       careerPosition: 'Position',
@@ -1119,7 +1123,7 @@ export default {
     loginInfoManagement: {
       title: 'Login credentials',
       description:
-        'Per company, store login IDs, passwords, and URLs for external sites (tax, banking, MCA/corporate registry); separate from MSV login accounts.',
+        'Per company, store login IDs, passwords, and URLs for external sites (tax, banking, MCA/corporate registry); separate from Hyvision One login accounts.',
       excelHint:
         'Edits save when you leave the cell. You can paste from Excel. Division, Login ID, and Password are required to save.',
       moreTools: 'Tools',
@@ -3311,7 +3315,7 @@ export default {
         info: 'Info',
       },
       hint:
-        'Tally: Gateway of Tally → Export → XML (Masters / Vouchers or Day Book). Already-imported vouchers (MSV no., GUID, Tally no.+date) and in-file duplicates are skipped. Accounts/parties are reused by name/GUID/GSTIN. Post from General Ledger. Issues from import, simulate, and preview are accumulated in the Report tab.',
+        'Tally: Gateway of Tally → Export → XML (Masters / Vouchers or Day Book). Already-imported vouchers (HVO no., GUID, Tally no.+date) and in-file duplicates are skipped. Accounts/parties are reused by name/GUID/GSTIN. Post from General Ledger. Issues from import, simulate, and preview are accumulated in the Report tab.',
       options: {
         importLedgers: 'Import ledgers',
         importVouchers: 'Import vouchers',
@@ -4609,7 +4613,7 @@ export default {
       emailLabel: 'Email / ID',
       signUpCta: 'Sign up',
       footerDevelopedBy: 'Developed by',
-      footerCompanyName: 'Minsub Ventures',
+      footerCompanyName: 'Hyvision India',
       footerWebsite: 'Hyvision One',
       footerCopyright: '© {{year}} Hyvision India',
       networkError: 'Network error: could not reach the backend server ({{url}}). Check that the server is running.',

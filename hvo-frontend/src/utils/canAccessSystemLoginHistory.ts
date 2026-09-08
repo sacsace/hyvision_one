@@ -1,11 +1,14 @@
 import { useReferenceDataStore } from '../store/referenceDataStore';
 
-/** 서버 `requireRootOrMinsubEmployee` 와 동일: root 또는 Hyvision India(플랫폼) 소속 */
-export function isMinsubCompanyName(name?: string | null): boolean {
+/** 서버 `requireRootOrPlatformEmployee` 와 동일: root 또는 Hyvision India(플랫폼) 소속 */
+export function isPlatformCompanyName(name?: string | null): boolean {
   if (!name) return false;
   const n = name.toLowerCase();
   return n.includes('hyvision') || n.includes('minsub ventures');
 }
+
+/** @deprecated use isPlatformCompanyName */
+export const isMinsubCompanyName = isPlatformCompanyName;
 
 export async function canAccessSystemLoginHistory(user?: {
   role?: string | null;
@@ -17,7 +20,7 @@ export async function canAccessSystemLoginHistory(user?: {
   if (!Number.isFinite(companyId) || companyId <= 0) return false;
   try {
     const company = await useReferenceDataStore.getState().fetchCompanyById(companyId);
-    return isMinsubCompanyName(company?.name);
+    return isPlatformCompanyName(company?.name);
   } catch {
     return false;
   }

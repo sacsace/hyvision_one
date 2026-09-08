@@ -876,7 +876,7 @@ const SystemSettings: React.FC = () => {
                 onChange={(e) => handleSettingChange('general', 'companyAbbreviation', e.target.value.toUpperCase())}
                 variant="outlined"
                 disabled={!canManageAll}
-                placeholder="MSV"
+                placeholder="HVO"
                 helperText={t('systemSettings.general.companyAbbreviationHint')}
               />
             </Box>

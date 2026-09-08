@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 
-/** MSV Excel export standard font size */
+/** HVO Excel export standard font size */
 export const EXCEL_EXPORT_FONT_SIZE = 9;
 
 /** Approximate Excel column width units for CJK + ASCII */

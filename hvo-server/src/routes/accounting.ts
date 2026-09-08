@@ -334,7 +334,7 @@ router.get('/gl/trial-balance', getTrialBalance);
 router.get('/gl/profit-and-loss', getProfitAndLoss);
 router.get('/gl/balance-sheet', getBalanceSheet);
 
-// Tally Export → MSV Import (XML/JSON, draft vouchers only)
+// Tally Export → HVO Import (XML/JSON, draft vouchers only)
 router.post('/tally/preview', restrictAuditToReadOnly, tallyImportUpload.single('file'), previewTallyImport);
 router.post('/tally/import', restrictAuditToReadOnly, tallyImportUpload.single('file'), runTallyImport);
 router.get('/tally/batches/:id', getTallyImportBatch);

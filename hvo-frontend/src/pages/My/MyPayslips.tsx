@@ -82,7 +82,8 @@ const MyPayslips: React.FC = () => {
     url: string;
     title: string;
     row: MyPayslipRow | null;
-  }>({ open: false, loading: false, url: '', title: '', row: null });
+    missing: boolean;
+  }>({ open: false, loading: false, url: '', title: '', row: null, missing: false });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,7 +120,7 @@ const MyPayslips: React.FC = () => {
   const closePreview = () => {
     setPreview((prev) => {
       if (prev.url) URL.revokeObjectURL(prev.url);
-      return { open: false, loading: false, url: '', title: '', row: null };
+      return { open: false, loading: false, url: '', title: '', row: null, missing: false };
     });
   };
 
@@ -132,21 +133,30 @@ const MyPayslips: React.FC = () => {
         url: '',
         title: buildPayslipPdfFilename(row.payroll_period, row.employee_name).replace(/\.pdf$/i, ''),
         row,
+        missing: false,
       };
     });
     try {
       const blob = await payrollService.downloadMyPayslip(row.id);
-      const pdfBlob =
-        blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+      const buf = await blob.arrayBuffer();
+      const head = new TextDecoder('utf-8').decode(buf.slice(0, 5));
+      if (head !== '%PDF-') {
+        setPreview((prev) => ({ ...prev, loading: false, url: '', missing: true }));
+        return;
+      }
+      const pdfBlob = new Blob([buf], { type: 'application/pdf' });
       const url = URL.createObjectURL(pdfBlob);
-      setPreview((prev) => ({ ...prev, loading: false, url }));
+      setPreview((prev) => ({ ...prev, loading: false, url, missing: false }));
     } catch (e: any) {
-      closePreview();
-      setError(
+      const msg =
         e?.response?.data?.message ||
-          e?.message ||
-          txt('명세서를 열지 못했습니다.', 'Failed to open payslip.')
-      );
+        e?.message ||
+        txt(
+          '명세서 파일이 없습니다. 급여 관리에서 다시 발송해 주세요.',
+          'Payslip file is missing. Please resend it from Payroll.'
+        );
+      setPreview((prev) => ({ ...prev, loading: false, url: '', missing: true }));
+      setError(msg);
     }
   };
 
@@ -399,7 +409,25 @@ const MyPayslips: React.FC = () => {
                 {txt('명세서를 불러오는 중...', 'Loading payslip...')}
               </Typography>
             </Box>
-          ) : preview.url ? (
+          ) : preview.missing || !preview.url ? (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: { xs: 360, sm: 520 },
+                px: 3,
+                textAlign: 'center',
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                {txt(
+                  '명세서 파일이 없습니다. 급여 관리에서 다시 발송해 주세요.',
+                  'Payslip file is missing. Please resend it from Payroll.'
+                )}
+              </Typography>
+            </Box>
+          ) : (
             <Box
               component="iframe"
               title={preview.title}
@@ -412,7 +440,7 @@ const MyPayslips: React.FC = () => {
                 bgcolor: '#FFFFFF',
               }}
             />
-          ) : null}
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1 }}>
           <Button size="small" onClick={closePreview} sx={hvoBodyOutlinedBtnSx}>
@@ -429,7 +457,7 @@ const MyPayslips: React.FC = () => {
                 <Download fontSize="small" />
               )
             }
-            disabled={!preview.row || downloadingId === preview.row?.id}
+            disabled={!preview.row || preview.missing || !preview.url || downloadingId === preview.row?.id}
             onClick={() => {
               if (!preview.row) return;
               void handleDownload(

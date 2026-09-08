@@ -90,7 +90,7 @@ BACKEND_URL=https://your-backend-url.railway.app
 BACKEND_WS_URL=wss://your-backend-url.railway.app
 
 # 앱 설정
-REACT_APP_NAME=MVS
+REACT_APP_NAME=Hyvision One
 REACT_APP_VERSION=3.0.0
 REACT_APP_ENVIRONMENT=production
 

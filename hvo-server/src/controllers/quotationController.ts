@@ -883,8 +883,8 @@ export const sendQuotation = async (req: RequestWithUser, res: Response) => {
       bodyEn,
       bodyHtmlKo: `<p style="margin:0 0 8px;">고객님께,</p><p style="margin:0 0 8px;">검토용 견적서 PDF를 첨부하오니 확인해 주시기 바랍니다.</p>${summaryTable}<p>문의 사항이 있으시면 이 메일로 회신해 주세요.</p>`,
       bodyHtmlEn: `<p style="margin:0 0 8px;">Dear Customer,</p><p style="margin:0 0 8px;">Please find our quotation in PDF attached for your review.</p>${summaryTable}<p>If you have any questions or need a revised offer, please reply to this email.</p>`,
-      footerKo: '본 메일은 MSV 시스템에서 자동 발송되었습니다.',
-      footerEn: 'This message was sent automatically from the MSV system.'
+      footerKo: '본 메일은 Hyvision One 시스템에서 자동 발송되었습니다.',
+      footerEn: 'This message was sent automatically from the Hyvision One system.'
     });
 
     const text = buildBilingualText({
@@ -892,8 +892,8 @@ export const sendQuotation = async (req: RequestWithUser, res: Response) => {
       titleEn: 'Quotation Sent',
       bodyKo,
       bodyEn,
-      footerKo: '본 메일은 MSV 시스템에서 자동 발송되었습니다.',
-      footerEn: 'This message was sent automatically from the MSV system.'
+      footerKo: '본 메일은 Hyvision One 시스템에서 자동 발송되었습니다.',
+      footerEn: 'This message was sent automatically from the Hyvision One system.'
     });
 
     /** Gmail 등은 전체 메시지 약 25MB 제한 — 첨부 PDF는 여유 있게 18MB 이하 권장 */

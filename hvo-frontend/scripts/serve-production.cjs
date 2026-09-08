@@ -1,7 +1,7 @@
 /**
  * Railway 등에서 CRA build 정적 파일을 서빙.
  * - HTTP→HTTPS 리다이렉트 (X-Forwarded-Proto)
- * - apex(hvoystem.in) → https://www.hvoystem.in 캐노니컬 리다이렉트
+ * - apex → https://hyvision.mvsystem.in 캐노니컬 리다이렉트 (CANONICAL_HOST)
  * - 보안 헤더 + CSP (리다이렉트 응답에도 적용)
  * - 민감 경로(.git, phpinfo, wp-json 등) 404 차단
  */
@@ -12,7 +12,7 @@ const { blockSensitivePaths } = require('./blockSensitivePaths.cjs');
 const PORT = Number.parseInt(process.env.PORT || '3000', 10) || 3000;
 const isProd = process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === '1';
 const buildDir = path.join(__dirname, '..', 'build');
-const CANONICAL_HOST = String(process.env.CANONICAL_HOST || 'www.hvoystem.in')
+const CANONICAL_HOST = String(process.env.CANONICAL_HOST || 'hyvision.mvsystem.in')
   .trim()
   .toLowerCase()
   .replace(/^https?:\/\//, '')
@@ -26,12 +26,12 @@ const resolveApiOrigin = () => {
   const raw =
     process.env.CSP_API_ORIGIN ||
     process.env.REACT_APP_API_URL ||
-    'https://api.hvoystem.in/api';
+    'https://hvo-backend-production.up.railway.app/api';
   try {
     const withScheme = /:\/\//.test(raw) ? raw : `https://${raw}`;
     return new URL(withScheme).origin;
   } catch {
-    return 'https://api.hvoystem.in';
+    return 'https://hvo-backend-production.up.railway.app';
   }
 };
 
@@ -102,7 +102,7 @@ app.use((req, res, next) => {
 
 /**
  * 캐노니컬 호스트 + HTTPS 강제.
- * - Host 가 apex(hvoystem.in)면 https://www… 로 301 (HTTP 다운그레이드 방지)
+ * - Host 가 apex이면 https://CANONICAL_HOST 로 301 (HTTP 다운그레이드 방지)
  * - X-Forwarded-Proto=http 이면 https 로 301
  */
 app.use((req, res, next) => {
@@ -119,9 +119,9 @@ app.use((req, res, next) => {
       ? 'https'
       : 'http';
 
-  const apexHost = CANONICAL_HOST.replace(/^www\./, '') || 'hvoystem.in';
+  const apexHost = CANONICAL_HOST.replace(/^www\./, '') || 'hyvision.mvsystem.in';
 
-  // apex → https://www (캐노니컬). HTTPS→HTTP 다운그레이드 방지.
+  // apex → https://www… 또는 캐노니컬. HTTPS→HTTP 다운그레이드 방지.
   if (hostHeader && hostHeader === apexHost && CANONICAL_HOST && hostHeader !== CANONICAL_HOST) {
     return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
   }
@@ -130,7 +130,7 @@ app.use((req, res, next) => {
     const targetHost =
       hostHeader === apexHost && CANONICAL_HOST
         ? CANONICAL_HOST
-        : hostHeader || CANONICAL_HOST || 'www.hvoystem.in';
+        : hostHeader || CANONICAL_HOST || 'hyvision.mvsystem.in';
     return res.redirect(301, `https://${targetHost}${req.originalUrl}`);
   }
 

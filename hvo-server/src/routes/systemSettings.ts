@@ -23,7 +23,7 @@ const normalizeSessionTimeoutMinutes = (value: unknown): number => {
 const buildDefaultSettings = (company: Company) => ({
   general: {
     companyName: company.name || 'Hyvision One',
-    /** 메일 제목 등 `[약어]` — 예: MSV */
+    /** 메일 제목 등 `[약어]` — 예: HVO */
     companyAbbreviation: '',
     companyLogo: '',
     timezone: company.timezone || 'Asia/Kolkata',

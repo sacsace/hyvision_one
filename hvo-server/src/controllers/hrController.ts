@@ -6,7 +6,7 @@ import { Op, Sequelize } from 'sequelize';
 import sequelize from '../config/database';
 import fs from 'fs';
 import path from 'path';
-import { ensureUploadSubdir } from '../utils/uploadPath';
+import { ensureUploadSubdir, resolveStoredUploadPath, bufferLooksLikePdf } from '../utils/uploadPath';
 import { buildNodemailerTransportOptions, getResolvedMailTransportOptions } from '../utils/mailConfig';
 import {
   parsePayrollPeriod,
@@ -23,10 +23,109 @@ import {
   breakdownToExtraFields,
   computeProratedSumTotal,
   computeDailyWorkerSumTotal,
-  type PfMode
+  normalizePfCalcMode,
+  type PfCalcMode
 } from '../services/indianStatutoryPayroll';
 import { resolveCompanyRegisteredStateCode } from '../utils/indianProfessionalTax';
 
+async function persistPayslipDelivery(params: {
+  tenant_id: number;
+  company_id: number;
+  senderId: number;
+  to: string;
+  period: string;
+  employeeName: string;
+  empId: string;
+  netSalary: number | null;
+  userId: number | null;
+  pdfBuffer: Buffer;
+}): Promise<{ pdf_url: string }> {
+  const {
+    tenant_id,
+    company_id,
+    senderId,
+    to,
+    period,
+    employeeName,
+    empId,
+    netSalary,
+    userId,
+    pdfBuffer
+  } = params;
+
+  if (!bufferLooksLikePdf(pdfBuffer)) {
+    throw new Error('INVALID_PDF');
+  }
+
+  const emailLower = to.toLowerCase();
+  let matchedUserId = userId;
+  let matchedEmpId = empId;
+
+  if (!matchedUserId) {
+    const byEmail = await (User as any).findOne({
+      where: {
+        tenant_id,
+        company_id,
+        status: 'active',
+        [Op.and]: [Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), emailLower)]
+      },
+      attributes: ['id', 'employee_number']
+    });
+    if (byEmail) {
+      matchedUserId = byEmail.id;
+      if (!matchedEmpId) matchedEmpId = String(byEmail.employee_number || '').trim();
+    }
+  }
+  if (!matchedUserId && matchedEmpId) {
+    const byEmp = await (User as any).findOne({
+      where: {
+        tenant_id,
+        company_id,
+        status: 'active',
+        employee_number: matchedEmpId
+      },
+      attributes: ['id', 'employee_number']
+    });
+    if (byEmp) matchedUserId = byEmp.id;
+  }
+
+  const dir = ensureUploadSubdir('payslips', String(tenant_id), String(company_id));
+  const fileName = `payslip-${period || 'na'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`;
+  const absPath = path.join(dir, fileName);
+  await fs.promises.writeFile(absPath, pdfBuffer);
+  const pdfUrl = `/uploads/payslips/${tenant_id}/${company_id}/${fileName}`;
+
+  const previousRows = await (PayslipDelivery as any).findAll({
+    where: {
+      tenant_id,
+      company_id,
+      payroll_period: period || '',
+      is_active: true,
+      [Op.and]: [Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('recipient_email')), emailLower)]
+    }
+  });
+  for (const prev of previousRows) {
+    await prev.update({ is_active: false });
+  }
+
+  await (PayslipDelivery as any).create({
+    tenant_id,
+    company_id,
+    user_id: matchedUserId ?? null,
+    payroll_period: period || '',
+    employee_name: employeeName || null,
+    recipient_email: to,
+    emp_id: matchedEmpId || null,
+    net_salary: Number.isFinite(netSalary as number) ? netSalary : null,
+    pdf_path: absPath,
+    pdf_url: pdfUrl,
+    sent_by: senderId,
+    sent_at: new Date(),
+    is_active: true
+  });
+
+  return { pdf_url: pdfUrl };
+}
 const MONTH_NAMES_EN = [
   'January',
   'February',
@@ -189,7 +288,11 @@ export const getPayrolls = async (req: RequestWithUser, res: Response) => {
             'employee_number',
             'birth_date',
             'hire_date',
-            'ot_eligible'
+            'ot_eligible',
+            'pf_calc_mode',
+            'bank_name',
+            'bank_account',
+            'bank_ifsc'
           ]
         }
       ],
@@ -246,7 +349,9 @@ export const getPayroll = async (req: RequestWithUser, res: Response) => {
             'position',
             'employee_number',
             'birth_date',
-            'hire_date'
+            'hire_date',
+            'ot_eligible',
+            'pf_calc_mode'
           ]
         }
       ]
@@ -358,7 +463,9 @@ export const bulkGeneratePayrolls = async (req: RequestWithUser, res: Response) 
           'bank_account',
           'bank_ifsc',
           'employment_type',
-          'ot_eligible'
+          'ot_eligible',
+          'pf_calc_mode',
+          'employee_number'
         ],
         transaction
       });
@@ -384,12 +491,11 @@ export const bulkGeneratePayrolls = async (req: RequestWithUser, res: Response) 
 
         const att = await aggregateAttendanceForPeriod(tenant_id, company_id, emp.id, bounds);
         const rawOtEligible = (emp as any).ot_eligible ?? (emp as any).get?.('ot_eligible');
-        const otEligible = !(
-          rawOtEligible === false ||
-          rawOtEligible === 0 ||
-          rawOtEligible === '0' ||
-          rawOtEligible === 'false'
-        );
+        const otEligible =
+          rawOtEligible === true ||
+          rawOtEligible === 1 ||
+          rawOtEligible === '1' ||
+          rawOtEligible === 'true';
         const dayOtHours = otEligible ? att.dayOtHours : 0;
         const nightOtHours = otEligible ? att.nightOtHours : 0;
         const overtimeHoursForPay = otEligible ? att.overtimeHours : 0;
@@ -429,21 +535,18 @@ export const bulkGeneratePayrolls = async (req: RequestWithUser, res: Response) 
 
         const bodyOpts = (req.body || {}) as Record<string, unknown>;
         const statutoryApplicable = bodyOpts.statutory_india !== false;
-        const pfCapAt1800 = bodyOpts.pf_cap_1800 !== false;
         const estimateTds = bodyOpts.estimate_tds !== false;
-        const pfMode: PfMode =
-          bodyOpts.pf_mode === 'gross_6pct'
-            ? 'gross_6pct'
-            : bodyOpts.pf_mode === 'epf_12pct_half'
-              ? 'epf_12pct_half'
-              : 'basic_12pct';
+        const pfCalcMode: PfCalcMode = normalizePfCalcMode(
+          (emp as any).pf_calc_mode ?? bodyOpts.pf_calc_mode ?? bodyOpts.pf_mode
+        );
 
         const stat = computeIndianStatutoryPayroll(gross_salary, {
           statutoryApplicable,
-          pfMode,
-          pfCapAt1800,
+          pfCalcMode,
+          pfMode: pfCalcMode,
           estimateTds,
           basicSalary: isDaily ? monthlyEquivForDaily : basic_salary,
+          totalSalary: isDaily ? monthlyEquivForDaily : basic_salary,
           registeredStateCode,
           payrollMonth: payroll_period
         });
@@ -451,12 +554,14 @@ export const bulkGeneratePayrolls = async (req: RequestWithUser, res: Response) 
 
         const birth = emp.birth_date ? String(emp.birth_date).split('T')[0] : '';
         const hire = emp.hire_date ? String(emp.hire_date).split('T')[0] : '';
+        const empNumber = emp.employee_number != null ? String(emp.employee_number).trim() : '';
 
         const bankAccount = emp.bank_account != null ? String(emp.bank_account).trim() : '';
         const bankIfsc = emp.bank_ifsc != null ? String(emp.bank_ifsc).trim() : '';
         const bankName = emp.bank_name != null ? String(emp.bank_name).trim() : '';
 
         const extra_fields = {
+          emp_id: empNumber,
           bank_account: bankAccount,
           ifsc: bankIfsc,
           bank_name: bankName,
@@ -490,8 +595,9 @@ export const bulkGeneratePayrolls = async (req: RequestWithUser, res: Response) 
           day_ot_hour: String(dayOtHours),
           night_ot_hour: String(nightOtHours),
           ot_eligible: String(otEligible),
-          indian_pf_mode: statutoryApplicable ? pfMode : '',
-          indian_statutory_version: 'sheet_ref_6pct_prorate_v2'
+          pf_calc_mode: statutoryApplicable ? pfCalcMode : '',
+          indian_pf_mode: statutoryApplicable ? pfCalcMode : '',
+          indian_statutory_version: 'pf_calc_mode_v1'
         };
 
         await (Payroll as any).create(
@@ -844,7 +950,7 @@ export const sendPayrollPayslip = async (req: RequestWithUser, res: Response) =>
         {
           model: User,
           as: 'employee',
-          attributes: ['email', 'username']
+          attributes: ['id', 'email', 'username', 'employee_number']
         }
       ]
     });
@@ -861,6 +967,9 @@ export const sendPayrollPayslip = async (req: RequestWithUser, res: Response) =>
 
     const b64 = pdf_base64.includes(',') ? pdf_base64.split(',')[1] : pdf_base64;
     const pdfBuffer = Buffer.from(b64, 'base64');
+    if (!bufferLooksLikePdf(pdfBuffer)) {
+      return res.status(400).json({ success: false, message: '유효한 PDF 파일이 아닙니다.' });
+    }
 
     const transporter = nodemailer.createTransport(buildNodemailerTransportOptions(mailOpts));
 
@@ -873,6 +982,9 @@ export const sendPayrollPayslip = async (req: RequestWithUser, res: Response) =>
       String(extra.employee_name || '').trim() ||
       String(emp?.username || '').trim() ||
       'Employee';
+    const empId =
+      String(extra.emp_id || '').trim() || String(emp?.employee_number || '').trim();
+    const netSalary = Number((payroll as any).net_salary);
     const companyLabel = shortCompanyNameForMail((companyRow as any)?.name);
     const mailVars = { name: uname, company: companyLabel, period };
     const subject = fillPayslipMailTemplate(DEFAULT_PAYSLIP_MAIL_SUBJECT, mailVars);
@@ -902,7 +1014,24 @@ export const sendPayrollPayslip = async (req: RequestWithUser, res: Response) =>
       ]
     });
 
-    res.json({ success: true, message: '메일을 발송했습니다.' });
+    await persistPayslipDelivery({
+      tenant_id,
+      company_id,
+      senderId,
+      to,
+      period,
+      employeeName: uname,
+      empId,
+      netSalary: Number.isFinite(netSalary) ? netSalary : null,
+      userId: emp?.id ?? null,
+      pdfBuffer
+    });
+
+    res.json({
+      success: true,
+      message: '메일을 발송했고, 급여 명세서에 저장했습니다.',
+      data: { saved_for_user: true }
+    });
   } catch (error) {
     console.error('급여 명세서 메일 오류:', error);
     res.status(500).json({ success: false, message: '메일 발송에 실패했습니다.' });
@@ -957,6 +1086,9 @@ export const sendImportedPayslip = async (req: RequestWithUser, res: Response) =
       .replace(/\n/g, '<br />');
     const b64 = pdfBase64.includes(',') ? pdfBase64.split(',')[1] : pdfBase64;
     const pdfBuffer = Buffer.from(b64, 'base64');
+    if (!bufferLooksLikePdf(pdfBuffer)) {
+      return res.status(400).json({ success: false, message: '유효한 PDF 파일이 아닙니다.' });
+    }
     const filenamePart = `Payslip (${period || 'Unknown'}) (${employeeName || 'Employee'})`
       .replace(/[\\/:*?"<>|]/g, '_')
       .slice(0, 120);
@@ -986,80 +1118,18 @@ export const sendImportedPayslip = async (req: RequestWithUser, res: Response) =
       attachments: [{ filename: `${filenamePart}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
     });
 
-    // 저장 키 = 수신 메일 + 급여월. user_id는 있으면 보조 연결(필수 아님).
-    const emailLower = to.toLowerCase();
-    let matchedUser =
-      (await (User as any).findOne({
-        where: {
-          tenant_id,
-          company_id,
-          status: 'active',
-          [Op.and]: [Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), emailLower)]
-        },
-        attributes: ['id', 'email', 'username', 'employee_number']
-      })) || null;
-
-    if (!matchedUser && empId) {
-      matchedUser = await (User as any).findOne({
-        where: {
-          tenant_id,
-          company_id,
-          status: 'active',
-          employee_number: empId
-        },
-        attributes: ['id', 'email', 'username', 'employee_number']
-      });
-    }
-
-    const dir = ensureUploadSubdir('payslips', String(tenant_id), String(company_id));
-    const fileName = `payslip-${period || 'na'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`;
-    const absPath = path.join(dir, fileName);
-    await fs.promises.writeFile(absPath, pdfBuffer);
-    const pdfUrl = `/uploads/payslips/${tenant_id}/${company_id}/${fileName}`;
-
-    // 같은 메일 + 같은 급여월 → 이전 활성 건 소프트 삭제 후 최신만 유지
-    const previousRows = await (PayslipDelivery as any).findAll({
-      where: {
-        tenant_id,
-        company_id,
-        payroll_period: period || '',
-        is_active: true,
-        [Op.and]: [
-          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('recipient_email')), emailLower)
-        ]
-      }
-    });
-    const oldPaths: string[] = [];
-    for (const prev of previousRows) {
-      const oldPath = String(prev.pdf_path || '');
-      if (oldPath) oldPaths.push(oldPath);
-      await prev.update({ is_active: false });
-    }
-
-    await (PayslipDelivery as any).create({
+    await persistPayslipDelivery({
       tenant_id,
       company_id,
-      user_id: matchedUser?.id ?? null,
-      payroll_period: period || '',
-      employee_name: employeeName || matchedUser?.username || null,
-      recipient_email: to,
-      emp_id: empId || matchedUser?.employee_number || null,
-      net_salary: Number.isFinite(netSalary as number) ? netSalary : null,
-      pdf_path: absPath,
-      pdf_url: pdfUrl,
-      sent_by: senderId,
-      sent_at: new Date(),
-      is_active: true
+      senderId,
+      to,
+      period,
+      employeeName: employeeName || 'Employee',
+      empId,
+      netSalary: Number.isFinite(netSalary as number) ? netSalary : null,
+      userId: null,
+      pdfBuffer
     });
-
-    for (const oldPath of oldPaths) {
-      if (oldPath === absPath) continue;
-      try {
-        await fs.promises.unlink(oldPath);
-      } catch {
-        /* ignore */
-      }
-    }
 
     return res.json({
       success: true,
@@ -1162,9 +1232,19 @@ export const downloadMyPayslip = async (req: RequestWithUser, res: Response) => 
       return res.status(404).json({ success: false, message: '급여 명세서를 찾을 수 없습니다.' });
     }
 
-    const filePath = String(row.pdf_path || '');
-    if (!filePath || !fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: '명세서 파일이 없습니다.' });
+    const filePath = resolveStoredUploadPath(row.pdf_path, row.pdf_url);
+    if (!filePath) {
+      return res.status(404).json({
+        success: false,
+        message: '명세서 파일이 없습니다. 급여 관리에서 다시 발송해 주세요.'
+      });
+    }
+    const fileBuf = await fs.promises.readFile(filePath);
+    if (!bufferLooksLikePdf(fileBuf)) {
+      return res.status(404).json({
+        success: false,
+        message: '명세서 파일이 없습니다. 급여 관리에서 다시 발송해 주세요.'
+      });
     }
 
     const downloadName = `Payslip (${row.payroll_period || 'Unknown'}) (${row.employee_name || 'Employee'})`
@@ -1172,7 +1252,7 @@ export const downloadMyPayslip = async (req: RequestWithUser, res: Response) => 
       .slice(0, 120) + '.pdf';
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
-    return fs.createReadStream(filePath).pipe(res);
+    return res.send(fileBuf);
   } catch (error) {
     console.error('내 급여 명세서 다운로드 오류:', error);
     return res.status(500).json({ success: false, message: '다운로드에 실패했습니다.' });

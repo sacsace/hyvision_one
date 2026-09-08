@@ -37,7 +37,7 @@ export type PayrollGridRow = {
   ot_rate: number;
   day_ot_hour: number;
   night_ot_hour: number;
-  /** 인사정보 OT 적용 대상 (false면 자동 OT 미반영) */
+  /** 인사정보 OT 적용 대상 (true일 때만 자동 OT) */
   ot_eligible?: boolean;
   /** 그리드에서 OT 시간을 수동 입력한 경우 — 미적용 직원이어도 OT 계산 허용 */
   ot_manual?: boolean;
@@ -46,8 +46,10 @@ export type PayrollGridRow = {
   sum_total: number;
   /** 사용자 추가 수당 컬럼 값 (컬럼 id → 금액) */
   custom_allowances?: Record<string, number>;
-  /** extra_fields.indian_pf_mode — 기본 basic_12pct */
-  indian_pf_mode?: 'basic_12pct' | 'gross_6pct' | 'epf_12pct_half';
+  /** 인사정보 PF 계산 방식 (기본 cap_1800) */
+  pf_calc_mode?: 'cap_1800' | 'basic_12pct' | 'total_12pct';
+  /** @deprecated use pf_calc_mode */
+  indian_pf_mode?: 'cap_1800' | 'basic_12pct' | 'total_12pct' | 'gross_6pct' | 'epf_12pct_half';
   pf_employee: string;
   pf_employer: string;
   esic_employee: string;

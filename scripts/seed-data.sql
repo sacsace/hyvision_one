@@ -7,7 +7,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 회사 데이터
 INSERT INTO companies (tenant_id, name, business_number, ceo_name, address, phone, email, industry, size, status, created_at, updated_at)
-VALUES (1, 'Minsub Ventures', '123-45-67890', 'Minsub Lee', 'Seoul, Korea', '02-1234-5678', 'minsub.lee@gmail.com', 'IT', 'medium', 'active', NOW(), NOW())
+VALUES (1, 'Hyvision India', '123-45-67890', 'Minsub Lee', 'Seoul, Korea', '02-1234-5678', 'minsub.lee@gmail.com', 'IT', 'medium', 'active', NOW(), NOW())
 ON CONFLICT (business_number) DO NOTHING;
 
 -- 메뉴 데이터

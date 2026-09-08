@@ -20,6 +20,7 @@ dist/
 logs
 *.log
 msv-server/server-log.txt
+hvo-server/server-log.txt
 
 # Runtime data
 pids
@@ -137,6 +138,7 @@ playwright/.cache/
 backup/
 msv-server/uploads/
 msv-frontend/.env.development
+hvo-frontend/.env.development
 # Runtime uploads (never commit user/binary uploads)
 hvo-server/uploads/
 msv-server/uploads/

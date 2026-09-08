@@ -196,9 +196,6 @@ const HqFxRatesPage = lazyPage(() =>
 const HqAccessLogsPage = lazyPage(() =>
   import('./pages/HQ/HqPortalPages').then((m) => ({ default: m.HqAccessLogsPage }))
 );
-const HqPrivacyPage = lazyPage(() =>
-  import('./pages/HQ/HqPortalPages').then((m) => ({ default: m.HqPrivacyPage }))
-);
 const HqUsersPage = lazyPage(() =>
   import('./pages/HQ/HqPortalPages').then((m) => ({ default: m.HqUsersPage }))
 );
@@ -461,8 +458,8 @@ function App() {
             <Route path="hq/compliance" element={<HqCompliancePage />} />
             <Route path="hq/fx-rates" element={<HqFxRatesPage />} />
             <Route path="hq/access-logs" element={<HqAccessLogsPage />} />
-            <Route path="hq/privacy" element={<HqPrivacyPage />} />
             <Route path="hq/users" element={<HqUsersPage />} />
+            <Route path="hq/privacy" element={<Navigate to="/hq/dashboard" replace />} />
             
             {/* 견적서 관리 */}
             <Route path="quotation" element={<QuotationManagement />} />

@@ -501,6 +501,10 @@ export default {
       otEligible: 'OT 적용 대상',
       otEligibleYes: '적용',
       otEligibleNo: '미적용',
+      pfCalcMode: 'PF 계산 방식',
+      pfCalcModeCap1800: '상한 1,800',
+      pfCalcModeBasic12: '기본급 12%',
+      pfCalcModeTotal12: '총급여 12%',
       careerHint: '이전 직장 경력을 추가할 수 있습니다. 회사명이 있는 항목만 저장됩니다.',
       careerCompany: '회사명',
       careerPosition: '직위',
@@ -1192,7 +1196,7 @@ export default {
     loginInfoManagement: {
       title: '로그인 정보',
       description:
-        '회사별 세무·은행·MCA(법인등기) 등 외부 사이트의 로그인 ID·비밀번호·URL을 저장하며, MSV 로그인 계정과는 별개입니다.',
+        '회사별 세무·은행·MCA(법인등기) 등 외부 사이트의 로그인 ID·비밀번호·URL을 저장하며, Hyvision One 로그인 계정과는 별개입니다.',
       excelHint:
         '셀을 클릭해 바로 입력하면 저장됩니다. 엑셀에서 복사한 영역을 그리드에 붙여 넣을 수 있습니다. (구분·Login ID·비밀번호가 모두 있어야 저장됩니다.)',
       moreTools: '관리·도구',
@@ -3812,7 +3816,7 @@ export default {
     },
     purchaseSalesStats: {
       title: '매입/매출 통계',
-      description: 'MVS에서 발행한 세금계산서(인보이스)와 지출결의서를 기준으로 매입·매출을 집계합니다. Tally 데이터와는 별개입니다.',
+      description: 'Hyvision One에서 발행한 세금계산서(인보이스)와 지출결의서를 기준으로 매입·매출을 집계합니다. Tally 데이터와는 별개입니다.',
       infoAlert: '매출은 Hyvision One 세금계산서(일반·전자), 매입은 지출결의서(지급완료) 기준으로 집계합니다. Tally 불러오기 데이터는 포함되지 않습니다.',
       downloadReport: '보고서 다운로드',
       filters: {
@@ -4679,7 +4683,7 @@ export default {
       emailLabel: '이메일 / ID',
       signUpCta: '회원가입',
       footerDevelopedBy: '개발',
-      footerCompanyName: 'Minsub Ventures',
+      footerCompanyName: 'Hyvision India',
       footerWebsite: 'Hyvision One',
       footerCopyright: '© {{year}} Hyvision India',
       networkError: '네트워크 오류: 백엔드 서버({{url}})에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.',
@@ -4808,7 +4812,7 @@ export default {
       },
       privacy: {
         title: '개인정보 처리방침',
-        intro: 'MVS는 이용자의 개인정보를 소중히 여기며, 관련 법령에 따라 안전하게 처리합니다.',
+        intro: 'Hyvision One은 이용자의 개인정보를 소중히 여기며, 관련 법령에 따라 안전하게 처리합니다.',
         lastUpdated: '2025-06-02',
         sections: [
           {

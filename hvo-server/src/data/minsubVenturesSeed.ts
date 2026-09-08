@@ -46,12 +46,15 @@ const PARENT_MENUS = [
   { name_ko: '업무 관리', name_en: 'Work', route: '/work', icon: 'Work', order: 5 },
   { name_ko: '매입/매출 관리', name_en: 'Purchasing & Sales', route: '/sales', icon: 'trending_up', order: 6 },
   { name_ko: '재고 관리', name_en: 'Inventory Management', route: '/inventory', icon: 'Inventory', order: 7 },
-  { name_ko: '회계관리', name_en: 'Accounting', route: '/accounting', icon: 'AccountBalance', order: 8 },
-  { name_ko: '알람', name_en: 'Notifications', route: '/communication', icon: 'Forum', order: 9 },
-  { name_ko: 'AI 분석', name_en: 'AI', route: '/ai', icon: 'Psychology', order: 10 },
-  { name_ko: '보고서', name_en: 'Reports', route: '/reports', icon: 'Assessment', order: 11 },
-  { name_ko: '기숙사 관리', name_en: 'Dormitory Management', route: '/hotel', icon: 'Hotel', order: 12 },
-  { name_ko: '시스템', name_en: 'System', route: '/system', icon: 'Settings', order: 13 },
+  { name_ko: '구매관리', name_en: 'Purchase Management', route: '/purchase', icon: 'shopping_cart', order: 8 },
+  { name_ko: '제조관리', name_en: 'Manufacturing Management', route: '/mfg', icon: 'precision_manufacturing', order: 9 },
+  { name_ko: '회계관리', name_en: 'Accounting', route: '/accounting', icon: 'AccountBalance', order: 10 },
+  { name_ko: '본사 포털', name_en: 'HQ Portal', route: '/hq', icon: 'corporate_fare', order: 11 },
+  { name_ko: '알람', name_en: 'Notifications', route: '/communication', icon: 'Forum', order: 12 },
+  { name_ko: 'AI 분석', name_en: 'AI', route: '/ai', icon: 'Psychology', order: 13 },
+  { name_ko: '보고서', name_en: 'Reports', route: '/reports', icon: 'Assessment', order: 14 },
+  { name_ko: '기숙사 관리', name_en: 'Dormitory Management', route: '/hotel', icon: 'Hotel', order: 15 },
+  { name_ko: '시스템', name_en: 'System', route: '/system', icon: 'Settings', order: 16 },
 ];
 
 const SUB_MENUS: Record<string, Array<{ name_ko: string; name_en: string; route: string; icon: string; order: number }>> = {
@@ -99,6 +102,45 @@ const SUB_MENUS: Record<string, Array<{ name_ko: string; name_en: string; route:
     { name_ko: '입고 관리', name_en: 'Stock In', route: '/inventory/stock-in', icon: 'move_to_inbox', order: 3 },
     { name_ko: '출고 관리', name_en: 'Stock Out', route: '/inventory/stock-out', icon: 'outbox', order: 4 },
     { name_ko: '재고 보고서', name_en: 'Inventory Report', route: '/inventory/report', icon: 'assessment', order: 5 },
+  ],
+  '/purchase': [
+    { name_ko: '구매 대시보드', name_en: 'Purchase Dashboard', route: '/purchase/dashboard', icon: 'dashboard', order: 1 },
+    { name_ko: '구매요청', name_en: 'Purchase Requisitions', route: '/purchase/requisitions', icon: 'request_quote', order: 2 },
+    { name_ko: '견적요청', name_en: 'RFQ', route: '/purchase/rfq', icon: 'mail', order: 3 },
+    { name_ko: '공급업체 견적', name_en: 'Supplier Quotations', route: '/purchase/supplier-quotations', icon: 'description', order: 4 },
+    { name_ko: '견적비교', name_en: 'Quotation Compare', route: '/purchase/quotation-compare', icon: 'compare', order: 5 },
+    { name_ko: '구매발주', name_en: 'Purchase Orders', route: '/purchase/orders', icon: 'shopping_cart', order: 6 },
+    { name_ko: '입고관리', name_en: 'Goods Receipts', route: '/purchase/goods-receipts', icon: 'inventory_2', order: 7 },
+    { name_ko: '품질검사', name_en: 'Quality Inspection', route: '/purchase/quality-inspections', icon: 'fact_check', order: 8 },
+    { name_ko: '매입 인보이스', name_en: 'Purchase Invoices', route: '/purchase/invoices', icon: 'receipt', order: 9 },
+    { name_ko: '구매반품', name_en: 'Purchase Returns', route: '/purchase/returns', icon: 'undo', order: 10 },
+    { name_ko: '지급요청', name_en: 'Payment Requests', route: '/purchase/payment-requests', icon: 'payments', order: 11 },
+    { name_ko: '구매현황', name_en: 'Purchase Reports', route: '/purchase/reports', icon: 'assessment', order: 12 },
+    { name_ko: '공급업체 관리', name_en: 'Suppliers', route: '/purchase/suppliers', icon: 'store', order: 13 },
+    { name_ko: '구매 설정', name_en: 'Purchase Settings', route: '/purchase/settings', icon: 'settings', order: 14 },
+  ],
+  '/mfg': [
+    { name_ko: '사업장', name_en: 'Branches', route: '/mfg/branches', icon: 'business', order: 1 },
+    { name_ko: '창고', name_en: 'Warehouses', route: '/mfg/warehouses', icon: 'warehouse', order: 2 },
+    { name_ko: '문서번호', name_en: 'Document Sequences', route: '/mfg/document-sequences', icon: 'tag', order: 3 },
+    { name_ko: '재고원장', name_en: 'Stock Ledger', route: '/mfg/stock-ledger', icon: 'receipt_long', order: 4 },
+    { name_ko: '감사로그', name_en: 'Audit Logs', route: '/mfg/audit-logs', icon: 'history', order: 5 },
+    { name_ko: '판매주문', name_en: 'Sales Orders', route: '/mfg/sales-orders', icon: 'shopping_bag', order: 6 },
+    { name_ko: '출고전표', name_en: 'Delivery Challans', route: '/mfg/delivery-challans', icon: 'local_shipping', order: 7 },
+    { name_ko: '재고예약', name_en: 'Stock Reservations', route: '/mfg/stock-reservations', icon: 'lock', order: 8 },
+    { name_ko: 'BOM', name_en: 'BOMs', route: '/mfg/boms', icon: 'account_tree', order: 9 },
+    { name_ko: '작업장', name_en: 'Work Centers', route: '/mfg/work-centers', icon: 'factory', order: 10 },
+    { name_ko: '작업지시', name_en: 'Work Orders', route: '/mfg/work-orders', icon: 'build', order: 11 },
+    { name_ko: '생산실적', name_en: 'Production Entries', route: '/mfg/production-entries', icon: 'precision_manufacturing', order: 12 },
+  ],
+  '/hq': [
+    { name_ko: '본사 대시보드', name_en: 'HQ Dashboard', route: '/hq/dashboard', icon: 'dashboard', order: 1 },
+    { name_ko: '본사 승인', name_en: 'HQ Approvals', route: '/hq/approvals', icon: 'fact_check', order: 2 },
+    { name_ko: '본사 리포트', name_en: 'HQ Reports', route: '/hq/reports', icon: 'assessment', order: 3 },
+    { name_ko: '컴플라이언스', name_en: 'Compliance', route: '/hq/compliance', icon: 'gavel', order: 4 },
+    { name_ko: '환율', name_en: 'FX Rates', route: '/hq/fx-rates', icon: 'currency_exchange', order: 5 },
+    { name_ko: '접근 로그', name_en: 'Access Logs', route: '/hq/access-logs', icon: 'history', order: 6 },
+    { name_ko: '본사 사용자', name_en: 'HQ Users', route: '/hq/users', icon: 'manage_accounts', order: 8 },
   ],
   '/accounting': [
     { name_ko: '계정과목', name_en: 'Chart of Accounts', route: '/accounting/chart-of-accounts', icon: 'account_tree', order: 1 },
@@ -150,7 +192,7 @@ async function ensureTenant() {
     where: { subdomain: 'hvo3' },
     defaults: {
       name: 'Hyvision One Solutions',
-      domain: 'hvoystem.in',
+      domain: 'hyvision.mvsystem.in',
       subdomain: 'hvo3',
       plan: 'enterprise',
       max_users: 200,
@@ -386,10 +428,10 @@ async function ensureBusinessData(tenantId: number, companyId: number, createdBy
   }
 
   const products = [
-    { product_code: 'MSV-001', name: 'Hyvision One Enterprise License', category: 'Software', unit_price: 50000, cost_price: 20000, stock_quantity: 50, min_stock_level: 10, unit: 'EA' },
-    { product_code: 'MSV-002', name: 'Cloud Hosting Package', category: 'Service', unit_price: 12000, cost_price: 5000, stock_quantity: 5, min_stock_level: 10, unit: 'EA' },
-    { product_code: 'MSV-003', name: 'Support Maintenance Kit', category: 'Service', unit_price: 8000, cost_price: 3000, stock_quantity: 25, min_stock_level: 5, unit: 'EA' },
-    { product_code: 'MSV-004', name: 'Hardware Integration Module', category: 'Hardware', unit_price: 35000, cost_price: 22000, stock_quantity: 3, min_stock_level: 5, unit: 'EA' },
+    { product_code: 'HVO-001', name: 'Hyvision One Enterprise License', category: 'Software', unit_price: 50000, cost_price: 20000, stock_quantity: 50, min_stock_level: 10, unit: 'EA' },
+    { product_code: 'HVO-002', name: 'Cloud Hosting Package', category: 'Service', unit_price: 12000, cost_price: 5000, stock_quantity: 5, min_stock_level: 10, unit: 'EA' },
+    { product_code: 'HVO-003', name: 'Support Maintenance Kit', category: 'Service', unit_price: 8000, cost_price: 3000, stock_quantity: 25, min_stock_level: 5, unit: 'EA' },
+    { product_code: 'HVO-004', name: 'Hardware Integration Module', category: 'Hardware', unit_price: 35000, cost_price: 22000, stock_quantity: 3, min_stock_level: 5, unit: 'EA' },
   ];
 
   for (const p of products) {
@@ -444,7 +486,7 @@ async function ensureNotices(companyId: number, authorId: number) {
   }
 
   const notices = [
-    { title: 'Minsub Ventures 시스템 오픈', content: 'Hyvision One 3.0 프로덕션 환경이 준비되었습니다.', category: 'general', priority: 'high' },
+    { title: 'Hyvision One 시스템 오픈', content: 'Hyvision One 프로덕션 환경이 준비되었습니다.', category: 'general', priority: 'high' },
     { title: '월간 재고 점검 안내', content: '매월 마지막 주 금요일 재고 실사를 진행합니다.', category: 'policy', priority: 'medium' },
   ];
 
@@ -463,8 +505,8 @@ async function ensureNotices(companyId: number, authorId: number) {
   console.log(`  ✅ 공지 ${notices.length}건 시도`);
 }
 
-export async function seedMinsubVenturesData() {
-  console.log('\n🏢 Minsub Ventures 초기 데이터 시드...');
+export async function seedHyvisionPlatformData() {
+  console.log('\n🏢 Hyvision One 초기 데이터 시드...');
 
   const tenant = await ensureTenant();
   const company = await ensureMinsubCompany(tenant.id);
@@ -476,6 +518,9 @@ export async function seedMinsubVenturesData() {
   await ensureBusinessData(tenant.id, company.id, rootUser.id);
   await ensureNotices(company.id, rootUser.id);
 
-  console.log('✅ Minsub Ventures 초기 데이터 시드 완료\n');
+  console.log('✅ Hyvision One 초기 데이터 시드 완료\n');
   return { tenantId: tenant.id, companyId: company.id };
 }
+
+/** @deprecated use seedHyvisionPlatformData */
+export const seedMinsubVenturesData = seedHyvisionPlatformData;

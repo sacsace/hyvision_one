@@ -100,7 +100,11 @@ jobs:
     if: github.event_name == 'push'
     strategy:
       matrix:
-        service: [backend, frontend]
+        include:
+          - service: backend
+            context: ./hvo-server
+          - service: frontend
+            context: ./hvo-frontend
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -129,7 +133,7 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./msv-${{ matrix.service }}
+        context: ${{ matrix.context }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

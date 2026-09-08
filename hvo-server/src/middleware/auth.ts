@@ -232,13 +232,14 @@ export const restrictAuditToReadOnly = (req: AuthRequest, res: Response, next: N
 };
 
 /** 플랫폼 운영사(Hyvision India / 기존 Minsub) 회사명 판별 */
-const isMinsubCompanyName = (name?: string): boolean => {
+const isPlatformCompanyName = (name?: string): boolean => {
   if (!name) return false;
   const n = name.toLowerCase();
   return n.includes('hyvision') || n.includes('minsub ventures');
 };
 
-export const requireRootOrMinsubEmployee = async (req: AuthRequest, res: Response, next: NextFunction) => {
+/** root 또는 플랫폼 운영사 소속만 허용 */
+export const requireRootOrPlatformEmployee = async (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -253,7 +254,7 @@ export const requireRootOrMinsubEmployee = async (req: AuthRequest, res: Respons
   try {
     const cached = getCachedAuthCompany(req.user.company_id);
     if (cached) {
-      if (!isMinsubCompanyName(cached.name as string)) {
+      if (!isPlatformCompanyName(cached.name as string)) {
         return res.status(403).json({
           success: false,
           message: '접근 권한이 없습니다.',
@@ -266,7 +267,7 @@ export const requireRootOrMinsubEmployee = async (req: AuthRequest, res: Respons
       attributes: ['id', 'name', 'tenant_id'],
     });
 
-    if (!company || !isMinsubCompanyName(company.name)) {
+    if (!company || !isPlatformCompanyName(company.name)) {
       return res.status(403).json({
         success: false,
         message: '접근 권한이 없습니다.',
@@ -276,10 +277,13 @@ export const requireRootOrMinsubEmployee = async (req: AuthRequest, res: Respons
     setCachedAuthCompany(req.user.company_id, company.toJSON ? company.toJSON() : company);
     return next();
   } catch (error) {
-    console.error('Minsub 권한 확인 오류:', error);
+    console.error('플랫폼 권한 확인 오류:', error);
     return res.status(500).json({
       success: false,
       message: '권한 확인 중 오류가 발생했습니다.',
     });
   }
 };
+
+/** @deprecated use requireRootOrPlatformEmployee */
+export const requireRootOrMinsubEmployee = requireRootOrPlatformEmployee;

@@ -4,7 +4,7 @@ import xlsx from 'xlsx';
 import path from 'path';
 import { DataTypes, Op } from 'sequelize';
 import { LoginInfo, LoginInfoTab, LoginLog, Company, User } from '../models';
-import { authenticateToken, requireRootOrMinsubEmployee } from '../middleware/auth';
+import { authenticateToken, requireRootOrPlatformEmployee } from '../middleware/auth';
 import { AuthRequest } from '../types';
 import sequelize from '../config/database';
 
@@ -27,7 +27,7 @@ const upload = multer({
 });
 
 router.use(authenticateToken);
-router.use(requireRootOrMinsubEmployee);
+router.use(requireRootOrPlatformEmployee);
 
 /** 마이그레이션 미적용 DB용: login_info_tabs + login_infos.tab_id 자동 반영 */
 let loginInfoTabsSchemaEnsured = false;

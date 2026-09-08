@@ -1,5 +1,5 @@
 /**
- * Tally Export (XML / JSON) → MSV GL import.
+ * Tally Export (XML / JSON) → Hyvision One GL import.
  *
  * Mapping contract (accurate DB write):
  * - GROUP     → gl_accounts (account_type=group, account_group, nature)
@@ -1544,7 +1544,7 @@ export const importTallyExport = async (
               `일자:${v.date || '-'}`,
               `유형:${v.voucherType || '-'}`,
               `라인:${i + 1}`,
-              '사유:MSV에 매칭/생성할 계정과목이 없음',
+              '사유:HVO에 매칭/생성할 계정과목이 없음',
             ].join(' · '),
           });
           break;

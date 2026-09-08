@@ -48,7 +48,7 @@ const listStateBoxSx = {
   gap: 1.5,
 } as const;
 
-/** 내 업무 > 내 업무 리스트 — 본인 담당 카드만 (MSV body 리스트 패턴) */
+/** 내 업무 > 내 업무 리스트 — 본인 담당 카드만 (HVO body 리스트 패턴) */
 const MyWorkList: React.FC = () => {
   const theme = useTheme();
   const { i18n } = useTranslation();

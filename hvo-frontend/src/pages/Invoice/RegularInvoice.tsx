@@ -107,11 +107,12 @@ interface Invoice {
   created_by?: number | null;
 }
 
-/** 일반 세금계산서 메일 제목용 회사 약자 — 예: Minsub Ventures → MSV */
+/** 일반 세금계산서 메일 제목용 회사 약자 — 예: Hyvision India → HVO */
 function buildInvoiceEmailCompanyAbbr(companyName: string): string {
   const n = (companyName || '').trim();
   const lower = n.toLowerCase();
-  if (lower.includes('minsub') && lower.includes('venture')) return 'MSV';
+  if (lower.includes('hyvision')) return 'HVO';
+  if (lower.includes('minsub') && lower.includes('venture')) return 'HVO';
   const cleaned = n.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (!cleaned) return 'CMP';
   return cleaned.slice(0, 3).padEnd(3, 'X');
@@ -171,7 +172,7 @@ Kind regards,
 ${params.issuerLegalName || 'Accounts'}
 
 ---
-This message was sent automatically from the MSV system.`;
+This message was sent automatically from the Hyvision One system.`;
   return { subject, message };
 }
 

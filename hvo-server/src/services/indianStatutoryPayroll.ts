@@ -9,19 +9,24 @@
  * - epf_12pct_half: Gross×50%×12%, 상한 1,800 옵션
  *
  * ESI: 지급합계(Q)>21,000 이면 면제. 직원 Q×0.75% / 사업주 Q×3.25%.
- * PT: Gross≥25,000 → 200(설정 가능).
+ * PT: Gross>25,000 일 때만 주별 규칙(또는 기본 200).
  * TDS: 구 세제 간이 추정(그리드에서 수정 가능).
  */
 
 import { computeProfessionalTaxByState } from '../utils/indianProfessionalTax';
 
-export type PfMode = 'basic_12pct' | 'gross_6pct' | 'epf_12pct_half';
+/** 직원별 PF 계산 방식 (인사정보 pf_calc_mode) */
+export type PfCalcMode = 'cap_1800' | 'basic_12pct' | 'total_12pct';
+
+/** @deprecated legacy grid/API aliases — map via normalizePfCalcMode */
+export type PfMode = 'basic_12pct' | 'gross_6pct' | 'epf_12pct_half' | PfCalcMode;
 
 export type IndianStatutoryOptions = {
   /** AD="A" 에 해당: PF/ESI/PT 적용 (false면 모두 0) */
   statutoryApplicable?: boolean;
-  /** PF 산출 방식. 기본 gross_6pct(참고 급여 시트) */
+  /** PF 산출 방식. 기본 cap_1800 */
   pfMode?: PfMode;
+  pfCalcMode?: PfCalcMode;
   /** epf_12pct_half 일 때만: true면 min(50%×Gross×12%, 1800) */
   pfCapAt1800?: boolean;
   /** ESI: 지급합계(Q)가 이 금액을 초과하면 면제. 기본 21000 */
@@ -38,17 +43,29 @@ export type IndianStatutoryOptions = {
   estimateTds?: boolean;
   /** 월 기본급(L) — ESI 면제(L>21000) 판단. 생략 시 Gross로 간주 */
   basicSalary?: number;
+  /** 급여합계(패키지) — total_12pct 기준 */
+  totalSalary?: number;
 };
 
 const DEFAULTS = {
   statutoryApplicable: true,
-  pfMode: 'basic_12pct' as PfMode,
+  pfMode: 'cap_1800' as PfCalcMode,
   pfCapAt1800: true,
   esiBasicCeiling: 21000,
   ptGrossThreshold: 25000,
   ptAmount: 200,
   estimateTds: true
 } as const;
+
+export function normalizePfCalcMode(raw: unknown): PfCalcMode {
+  const v = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (v === 'basic_12pct') return 'basic_12pct';
+  if (v === 'total_12pct' || v === 'gross_6pct') return 'total_12pct';
+  if (v === 'cap_1800' || v === 'epf_12pct_half') return 'cap_1800';
+  return 'cap_1800';
+}
 
 function rupee(n: number): number {
   return Math.round(n * 100) / 100;
@@ -118,6 +135,31 @@ export function computePfFromBasicSalary(basicSalary: number): { pf_employee: nu
   return { pf_employee: amount, pf_employer: amount };
 }
 
+/** 기본급 12% (상한 없음) — 직원·사업주 각각 */
+export function computePfBasic12NoCap(basicSalary: number): { pf_employee: number; pf_employer: number } {
+  const amount = Math.round(Math.max(0, basicSalary) * 0.12);
+  return { pf_employee: amount, pf_employer: amount };
+}
+
+/** 총급여(패키지)×12%를 직원·사업주 50/50 */
+export function computePfTotal12Split(totalSalary: number): { pf_employee: number; pf_employer: number } {
+  const totalPf = Math.round(Math.max(0, totalSalary) * 0.12);
+  const employee = Math.round(totalPf / 2);
+  const employer = totalPf - employee;
+  return { pf_employee: employee, pf_employer: employer };
+}
+
+export function computePfByCalcMode(
+  mode: PfCalcMode,
+  basicSalary: number,
+  totalSalary: number
+): { pf_employee: number; pf_employer: number } {
+  const m = normalizePfCalcMode(mode);
+  if (m === 'basic_12pct') return computePfBasic12NoCap(basicSalary);
+  if (m === 'total_12pct') return computePfTotal12Split(totalSalary > 0 ? totalSalary : basicSalary);
+  return computePfFromBasicSalary(basicSalary);
+}
+
 /** 참고 시트: PF 직원·고용주 각각 Sum Total의 6% */
 export function computePfSixPercentOfGross(gross: number): { pf_employee: number; pf_employer: number } {
   const x = rupee(gross * 0.06);
@@ -137,7 +179,7 @@ export function computeEsiEmployer(gross: number, esiSumCeiling = 21000): number
 }
 
 export function computePt(gross: number, threshold: number, ptAmount: number): number {
-  if (gross >= threshold) return rupee(ptAmount);
+  if (gross > threshold) return rupee(ptAmount);
   return 0;
 }
 
@@ -234,21 +276,24 @@ export function computeIndianStatutoryPayroll(
   let tds = 0;
 
   if (o.statutoryApplicable) {
-    const mode = o.pfMode ?? DEFAULTS.pfMode;
+    const mode = normalizePfCalcMode(o.pfCalcMode ?? o.pfMode ?? DEFAULTS.pfMode);
     const basicForPf =
       o.basicSalary != null && Number.isFinite(o.basicSalary) ? rupee(o.basicSalary as number) : epfWageBase(gross);
+    const totalForPf =
+      o.totalSalary != null && Number.isFinite(o.totalSalary) ? rupee(o.totalSalary as number) : basicForPf;
 
     if (mode === 'basic_12pct') {
+      const pf = computePfBasic12NoCap(basicForPf);
+      pf_employee = pf.pf_employee;
+      pf_employer = pf.pf_employer;
+    } else if (mode === 'total_12pct') {
+      const pf = computePfTotal12Split(totalForPf);
+      pf_employee = pf.pf_employee;
+      pf_employer = pf.pf_employer;
+    } else {
       const pf = computePfFromBasicSalary(basicForPf);
       pf_employee = pf.pf_employee;
       pf_employer = pf.pf_employer;
-    } else if (mode === 'gross_6pct') {
-      const p6 = computePfSixPercentOfGross(gross);
-      pf_employee = p6.pf_employee;
-      pf_employer = p6.pf_employer;
-    } else {
-      pf_employee = computePfEmployeeEpfHalf(gross, o.pfCapAt1800);
-      pf_employer = computePfEmployerMatchEmployee(pf_employee);
     }
     esic_employee = computeEsiEmployee(gross, o.esiBasicCeiling);
     esic_employer = computeEsiEmployer(gross, o.esiBasicCeiling);

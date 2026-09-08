@@ -1,7 +1,7 @@
 Hyvision One Notifier (Windows tray)
 ===========================
 
-Lightweight tray notifier for Minsub Ventures System (MVS).
+Lightweight tray notifier for Hyvision One.
 - Shows Windows balloon tips for new Hyvision One notifications
 - Runs in system tray (no browser required while running)
 - Does NOT enable Startup by default

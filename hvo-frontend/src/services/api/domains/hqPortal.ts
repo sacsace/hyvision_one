@@ -30,9 +30,6 @@ export const hqPortalService = {
     (await api.post('/hq/compliance', data)).data,
 
   listAccessLogs: async () => (await api.get('/hq/access-logs')).data,
-  getPrivacy: async () => (await api.get('/hq/privacy-settings')).data,
-  updatePrivacy: async (data: Record<string, unknown>) =>
-    (await api.put('/hq/privacy-settings', data)).data,
 
   listHqUsers: async () => (await api.get('/hq/users-hq')).data,
   updateHqUser: async (id: number, data: Record<string, unknown>) =>
