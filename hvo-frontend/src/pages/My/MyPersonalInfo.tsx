@@ -84,6 +84,7 @@ type ProfileDetail = {
   bank_account?: string | null;
   bank_ifsc?: string | null;
   ot_eligible?: boolean | null;
+  pf_calc_mode?: 'cap_1800' | 'basic_12pct' | 'total_12pct' | null;
   is_payment_officer?: boolean | null;
   career_history?: CareerEntry[] | null;
   education_history?: EducationEntry[] | null;
@@ -838,6 +839,14 @@ const MyPersonalInfo: React.FC = () => {
                       {profile.ot_eligible === true
                         ? t('userManagement.otEligibleYes')
                         : t('userManagement.otEligibleNo')}
+                    </ReadField>
+                    <ReadField label={t('userManagement.pfCalcMode')}>
+                      {(() => {
+                        const m = String(profile.pf_calc_mode ?? '').trim();
+                        if (m === 'total_12pct') return t('userManagement.pfCalcModeTotal12');
+                        if (m === 'basic_12pct') return t('userManagement.pfCalcModeBasic12');
+                        return t('userManagement.pfCalcModeCap1800');
+                      })()}
                     </ReadField>
                   </Box>
                 </AccordionDetails>

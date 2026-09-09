@@ -2437,27 +2437,60 @@ const UserManagement: React.FC = () => {
         <>
           <Card elevation={0} sx={hvoBodyCardSx}>
             <Box sx={hvoBodySectionHeaderSx}>
-              <Typography
-                component="h2"
-                sx={{
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  letterSpacing: '-0.02em',
-                  color: 'text.primary',
-                  lineHeight: 1.3,
-                }}
-              >
-                {editingUser ? t('userManagement.editUserTitle') : t('userManagement.createUserTitle')}
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<ArrowBackIcon fontSize="small" />}
-                onClick={handleBackToList}
-                sx={hvoBodyOutlinedBtnSx}
-              >
-                {t('userManagement.backToList')}
-              </Button>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography
+                  component="h2"
+                  sx={{
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                    color: 'text.primary',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {editingUser ? t('userManagement.editUserTitle') : t('userManagement.createUserTitle')}
+                </Typography>
+                {!editingUser && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 640 }}>
+                    {t('userManagement.bulkRegisterHint')}
+                  </Typography>
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                {!editingUser && (
+                  <>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<DownloadIcon fontSize="small" />}
+                      disabled={menusLoading || !(hrElevated || userMgmtMenuFlags.canCreate)}
+                      onClick={handleDownloadSample}
+                      sx={hvoBodyOutlinedBtnSx}
+                    >
+                      {t('userManagement.excelSample')}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<UploadIcon fontSize="small" />}
+                      disabled={menusLoading || !(hrElevated || userMgmtMenuFlags.canCreate)}
+                      onClick={() => setImportDialogOpen(true)}
+                      sx={hvoBodyOutlinedBtnSx}
+                    >
+                      {t('userManagement.excelImport')}
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<ArrowBackIcon fontSize="small" />}
+                  onClick={handleBackToList}
+                  sx={hvoBodyOutlinedBtnSx}
+                >
+                  {t('userManagement.backToList')}
+                </Button>
+              </Box>
             </Box>
           </Card>
 
@@ -4265,7 +4298,21 @@ const UserManagement: React.FC = () => {
       >
         <DialogTitle>{t('userManagement.excelImportTitle')}</DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              {t('userManagement.excelImportDesc')}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<DownloadIcon fontSize="small" />}
+                onClick={handleDownloadSample}
+                sx={hvoBodyOutlinedBtnSx}
+              >
+                {t('userManagement.excelSample')}
+              </Button>
+            </Box>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -4290,7 +4337,7 @@ const UserManagement: React.FC = () => {
             />
             {importResult && (
               <Box sx={{ mt: 2 }}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
                   {t('userManagement.importResultTitle')}
                 </Typography>
                 <Alert severity="success" sx={{ mb: 2 }}>

@@ -2672,25 +2672,40 @@ const WorkBoardDetailPage: React.FC = () => {
     const message = boardName
       ? t('workBoards.deleteConfirm.message', { name: boardName })
       : t('workBoards.deleteConfirm.messageFallback');
+
+    const runDelete = () => {
+      void (async () => {
+        try {
+          const res = await workBoardService.deleteBoard(boardId);
+          if (res.success) {
+            showSuccessPopup(t('workBoards.deleteConfirm.success'));
+            navigate('/work/projects');
+          } else {
+            showErrorPopup(
+              res.message || t('workBoards.deleteConfirm.failed'),
+              t('workBoards.title')
+            );
+          }
+        } catch (e: any) {
+          showErrorPopup(e, t('workBoards.title'));
+        }
+      })();
+    };
+
+    // 1차: 보드 삭제 → 2차: 카드 전체 삭제 재확인
     showConfirm(
       message,
       () => {
-        void (async () => {
-          try {
-            const res = await workBoardService.deleteBoard(boardId);
-            if (res.success) {
-              showSuccessPopup(t('workBoards.deleteConfirm.success'));
-              navigate('/work/projects');
-            } else {
-              showErrorPopup(
-                res.message || t('workBoards.deleteConfirm.failed'),
-                t('workBoards.title')
-              );
-            }
-          } catch (e: any) {
-            showErrorPopup(e, t('workBoards.title'));
-          }
-        })();
+        // ConfirmDialog가 닫힌 뒤 바로 다음 확인을 띄우기 위해 다음 tick에 호출
+        window.setTimeout(() => {
+          showConfirm(t('workBoards.deleteConfirm.cardsMessage'), runDelete, {
+            title: t('workBoards.deleteConfirm.cardsTitle'),
+            confirmText: t('common.delete'),
+            cancelText: t('common.cancel'),
+            confirmColor: 'error',
+            messageTone: 'danger',
+          });
+        }, 0);
       },
       {
         title: t('workBoards.deleteConfirm.title'),
@@ -2832,6 +2847,7 @@ const WorkBoardDetailPage: React.FC = () => {
   const canReopenCardDetail =
     isCardDetailCompleted &&
     (() => {
+      if (isRootUser) return true;
       const uid = Number(user?.id);
       if (!uid) return false;
       const isCreator =
@@ -2842,6 +2858,7 @@ const WorkBoardDetailPage: React.FC = () => {
     })();
 
   const canReopenCard = (card: BoardCard) => {
+    if (isRootUser) return true;
     const uid = Number(user?.id);
     if (!uid) return false;
     const isCreator = card.created_by != null && Number(card.created_by) === uid;
@@ -4178,8 +4195,8 @@ const WorkBoardDetailPage: React.FC = () => {
                 title={
                   isCardDetailCompleted && !canReopenCardDetail
                     ? txt(
-                        '담당자 또는 업무를 지시한 사람만 재오픈할 수 있습니다.',
-                        'Only the assignee or task creator can reopen it.'
+                        '담당자, 업무를 지시한 사람 또는 root만 재오픈할 수 있습니다.',
+                        'Only the assignee, task creator, or root can reopen it.'
                       )
                     : ''
                 }
@@ -4966,8 +4983,8 @@ const WorkBoardDetailPage: React.FC = () => {
                         reopenAllowed
                           ? txt('업무를 다시 진행 상태로 이동합니다.', 'Move this task back to active work.')
                           : txt(
-                              '담당자 또는 업무를 지시한 사람만 재오픈할 수 있습니다.',
-                              'Only the assignee or task creator can reopen it.'
+                              '담당자, 업무를 지시한 사람 또는 root만 재오픈할 수 있습니다.',
+                              'Only the assignee, task creator, or root can reopen it.'
                             )
                       }
                     >
@@ -5138,6 +5155,7 @@ const WorkBoardDetailPage: React.FC = () => {
         cancelText={dialogState.cancelText}
         cancelTextKey={dialogState.cancelTextKey}
         confirmColor={dialogState.confirmColor}
+        messageTone={dialogState.messageTone}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />

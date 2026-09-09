@@ -44,6 +44,9 @@ import Notice from './Notice';
 import NoticePoll from './NoticePoll';
 import NoticePollOption from './NoticePollOption';
 import NoticePollVote from './NoticePollVote';
+import NoticeView from './NoticeView';
+import CompanyPolicy from './CompanyPolicy';
+import CompanyPolicyRevision from './CompanyPolicyRevision';
 import ExpenseReport from './ExpenseReport';
 import Budget from './Budget';
 import Asset from './Asset';
@@ -438,6 +441,22 @@ Product.hasMany(InventoryTransaction, { foreignKey: 'product_id', as: 'transacti
 (User as any).hasMany(NoticePollVote, { foreignKey: 'user_id', as: 'noticePollVotes' });
 (NoticePollVote as any).belongsTo(User, { foreignKey: 'user_id', as: 'voter' });
 
+(Notice as any).hasMany(NoticeView, { foreignKey: 'notice_id', as: 'viewsLog' });
+(NoticeView as any).belongsTo(Notice, { foreignKey: 'notice_id', as: 'notice' });
+(User as any).hasMany(NoticeView, { foreignKey: 'user_id', as: 'noticeViews' });
+(NoticeView as any).belongsTo(User, { foreignKey: 'user_id', as: 'viewer' });
+
+(Tenant as any).hasMany(CompanyPolicy, { foreignKey: 'tenant_id', as: 'companyPolicies' });
+(CompanyPolicy as any).belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
+(Company as any).hasMany(CompanyPolicy, { foreignKey: 'company_id', as: 'companyPolicies' });
+(CompanyPolicy as any).belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+(User as any).hasMany(CompanyPolicy, { foreignKey: 'updated_by', as: 'updatedCompanyPolicies' });
+(CompanyPolicy as any).belongsTo(User, { foreignKey: 'updated_by', as: 'updater' });
+(CompanyPolicy as any).hasMany(CompanyPolicyRevision, { foreignKey: 'policy_id', as: 'revisions' });
+(CompanyPolicyRevision as any).belongsTo(CompanyPolicy, { foreignKey: 'policy_id', as: 'policy' });
+(User as any).hasMany(CompanyPolicyRevision, { foreignKey: 'changed_by', as: 'companyPolicyRevisions' });
+(CompanyPolicyRevision as any).belongsTo(User, { foreignKey: 'changed_by', as: 'editor' });
+
 // 회사와 GST 번호 관계
 (Company as any).hasMany(CompanyGstNumber, { foreignKey: 'company_id', as: 'gstNumbers' });
 CompanyGstNumber.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
@@ -810,6 +829,9 @@ export {
   NoticePoll,
   NoticePollOption,
   NoticePollVote,
+  NoticeView,
+  CompanyPolicy,
+  CompanyPolicyRevision,
   ExpenseReport,
   Budget,
   Asset,

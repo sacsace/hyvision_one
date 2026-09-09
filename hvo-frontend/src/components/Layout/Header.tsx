@@ -430,9 +430,9 @@ const Header: React.FC<HeaderProps> = ({
                 src="/hyvision-logo.png"
                 alt={cleanCompanyName(companyInfo.name) || t('common.companyNameFallback')}
                 sx={{
-                  height: 44,
+                  height: 40,
                   width: 'auto',
-                  maxWidth: { xs: 140, sm: 180 },
+                  maxWidth: { xs: 126, sm: 162 },
                   objectFit: 'contain',
                   objectPosition: 'left center',
                   display: 'block',

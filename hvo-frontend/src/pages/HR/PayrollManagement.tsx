@@ -35,16 +35,17 @@ import {
   Add as AddIcon,
   Search as SearchIcon,
   RestartAlt as ResetIcon,
-  AttachMoney as MoneyIcon,
   Email as EmailIcon,
   TaskAlt as TaskAltIcon,
-  FileDownload as FileDownloadIcon
+  FileDownload as FileDownloadIcon,
+  FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import { payrollService, companyService } from '../../services/api';
 import { useStore } from '../../store';
 import PayrollExcelGrid, { payrollRecordToGridRow, type PayrollGridRow } from './PayrollExcelGrid';
 import PayrollPayslipDialog from './PayrollPayslipDialog';
 import PayrollSendPayslipsDialog from './PayrollSendPayslipsDialog';
+import PayrollExcelImportDialog from './PayrollExcelImportDialog';
 import type { PayslipHeaderLayout } from './PayslipContent';
 import { exportPayrollGridToExcel } from './payroll/exportPayrollGridToExcel';
 import { resolveRegisteredStateCodeFromCompanyLike } from './payroll/indianProfessionalTax';
@@ -131,6 +132,7 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
     return saved === 'compact' || saved === 'companyFirst' ? saved : 'standard';
   });
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
   const [lockedPeriods, setLockedPeriods] = useState<Set<string>>(new Set());
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [sendAfterCompleteOpen, setSendAfterCompleteOpen] = useState(false);
@@ -475,6 +477,31 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
           : t('payrollManagement.payslip.sendNoRowsForPayMonth')
     : '';
 
+  const excelUploadDisabled =
+    payslipSendOnly ||
+    menuFlags.menusLoading ||
+    !menuFlags.canMutate ||
+    loading ||
+    !periodKey ||
+    isFuturePayMonth ||
+    (!!periodKey && lockedPeriods.has(periodKey));
+
+  const excelUploadTooltip = excelUploadDisabled
+    ? loading || menuFlags.menusLoading
+      ? ''
+      : payslipSendOnly
+        ? ''
+        : !menuFlags.canMutate
+          ? t('common.menuNoMutate')
+          : !periodKey
+            ? t('payrollManagement.errors.periodRequired')
+            : isFuturePayMonth
+              ? t('payrollManagement.errors.futurePayMonthNotAllowed')
+              : periodKey && lockedPeriods.has(periodKey)
+                ? t('payrollManagement.errors.periodLocked')
+                : ''
+    : '';
+
   /** 상단「+ 급여 생성」: 확정(생성 완료)된 월은 열 수 없음 */
   const bulkCreateOpenDisabled =
     menuFlags.menusLoading ||
@@ -615,9 +642,9 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
           }}
         >
           {[
-            { key: 'gross', label: t('payrollManagement.summary.totalSalary'), value: `Rs. ${formatPayrollSummaryRupee(summaryStats.gross)}` },
-            { key: 'net', label: t('payrollManagement.summary.netSalary'), value: `Rs. ${formatPayrollSummaryRupee(summaryStats.net)}` },
-            { key: 'tax', label: t('payrollManagement.summary.totalTax'), value: `Rs. ${formatPayrollSummaryRupee(summaryStats.tax)}` },
+            { key: 'gross', label: t('payrollManagement.summary.totalSalary'), value: formatPayrollSummaryRupee(summaryStats.gross) },
+            { key: 'net', label: t('payrollManagement.summary.netSalary'), value: formatPayrollSummaryRupee(summaryStats.net) },
+            { key: 'tax', label: t('payrollManagement.summary.totalTax'), value: formatPayrollSummaryRupee(summaryStats.tax) },
             { key: 'pending', label: t('payrollManagement.summary.pendingPayroll'), value: String(summaryStats.pending), valueColor: 'warning.main' as const },
           ].map((item) => (
             <Card key={item.key} elevation={0} sx={hvoKpiCardSx}>
@@ -669,6 +696,22 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
                     sx={hvoBodyOutlinedBtnSx}
                   >
                     {t('payrollManagement.actions.exportExcel')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {!payslipSendOnly && (
+              <Tooltip title={excelUploadTooltip} disableHoverListener={!excelUploadTooltip}>
+                <span style={{ display: 'inline-flex' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<FileUploadIcon fontSize="small" />}
+                    onClick={() => setExcelImportOpen(true)}
+                    disabled={excelUploadDisabled}
+                    sx={hvoBodyOutlinedBtnSx}
+                  >
+                    {t('payrollManagement.actions.uploadExcel')}
                   </Button>
                 </span>
               </Tooltip>
@@ -856,7 +899,6 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
           </Box>
         ) : gridRows.length === 0 ? (
           <Box sx={listStateBoxSx}>
-            <MoneyIcon sx={{ fontSize: 48, color: 'text.secondary', opacity: 0.3 }} />
             <Typography variant="subtitle1" sx={{ fontWeight: 700, letterSpacing: '-0.01em', color: 'text.primary' }}>
               {hasActiveFilters
                 ? t('payrollManagement.empty.noResults')
@@ -964,6 +1006,17 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
         }}
         onSent={(msg) => setSuccess(msg)}
         onError={(msg) => setError(msg)}
+      />
+
+      <PayrollExcelImportDialog
+        open={excelImportOpen}
+        onClose={() => setExcelImportOpen(false)}
+        payrollPeriod={periodKey || payrollPeriod.trim()}
+        companyId={user?.company_id ?? null}
+        onSuccess={() => {
+          setSuccess(t('payrollManagement.success.importedExcel'));
+          void loadPayrollData();
+        }}
       />
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>

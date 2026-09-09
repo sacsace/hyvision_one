@@ -1,7 +1,7 @@
 import express from 'express';
 import { Op } from 'sequelize';
 import bcrypt from 'bcrypt';
-import { User, Company, Tenant } from '../models';
+import { User, Company, Tenant, Department, Position } from '../models';
 import { resolveDepartmentFieldsForUser } from '../controllers/departmentController';
 import { resolvePositionFieldsForUser } from '../controllers/positionController';
 import { authenticateToken } from '../middleware/auth';
@@ -1958,7 +1958,7 @@ router.get(
 router.post(
   '/excel/import',
   authenticateToken,
-  requireAdminRootOrUserMenuPermission('can_edit'),
+  requireAdminRootOrUserMenuPermission('can_create'),
   upload.single('file'),
   async (req, res) => {
   try {
@@ -2006,6 +2006,52 @@ router.post(
       }
     }
 
+    const deptCache = new Map<string, { id: number; name: string } | null>();
+    const posCache = new Map<string, { id: number; name: string } | null>();
+
+    const resolveOrgByName = async (
+      kind: 'dept' | 'pos',
+      nameRaw: string,
+      companyIdForLookup: number | null | undefined
+    ): Promise<{ id: number | null; name: string | null }> => {
+      const name = String(nameRaw || '').trim();
+      if (!name) return { id: null, name: null };
+      if (companyIdForLookup == null || !Number.isFinite(Number(companyIdForLookup))) {
+        return { id: null, name };
+      }
+      const cacheKey = `${companyIdForLookup}:${name.toLowerCase()}`;
+      const cache = kind === 'dept' ? deptCache : posCache;
+      if (cache.has(cacheKey)) {
+        const hit = cache.get(cacheKey)!;
+        return hit ? { id: hit.id, name: hit.name } : { id: null, name };
+      }
+      const row =
+        kind === 'dept'
+          ? await Department.findOne({
+              where: {
+                tenant_id: tenantId,
+                company_id: Number(companyIdForLookup),
+                is_active: true,
+                name: { [Op.iLike]: name },
+              },
+            })
+          : await Position.findOne({
+              where: {
+                tenant_id: tenantId,
+                company_id: Number(companyIdForLookup),
+                is_active: true,
+                name: { [Op.iLike]: name },
+              },
+            });
+      if (row) {
+        const mapped = { id: Number(row.id), name: String(row.name) };
+        cache.set(cacheKey, mapped);
+        return mapped;
+      }
+      cache.set(cacheKey, null);
+      return { id: null, name };
+    };
+
     // 각 행 처리
     for (let i = 0; i < data.length; i++) {
       const row = data[i] as any;
@@ -2020,10 +2066,13 @@ router.post(
           continue;
         }
 
+        const userid = row['사용자ID'].toString().trim();
+        const email = row['이메일'].toString().trim();
+
         // 중복 사용자ID 확인
         const existingUser = await (User as any).findOne({
           where: {
-            userid: row['사용자ID'].toString().trim()
+            userid
           }
         });
 
@@ -2036,10 +2085,10 @@ router.post(
           continue;
         }
 
-        // 중복 이메일 확인
+        // 중복 이메일 확인 (대소문자 무시)
         const existingEmail = await (User as any).findOne({
           where: {
-            email: row['이메일'].toString().trim()
+            email: { [Op.iLike]: email }
           }
         });
 
@@ -2101,26 +2150,39 @@ router.post(
           ? row['역할 (root/admin/user/audit)'].toString().toLowerCase()
           : 'user';
 
-        if (importRole === 'audit' && userRole !== 'root') {
+        if ((importRole === 'audit' || importRole === 'root') && userRole !== 'root') {
           results.failed.push({
             row: i + 2,
             data: row,
-            error: 'audit 역할은 root 권한을 가진 사용자만 부여할 수 있습니다.'
+            error: `${importRole} 역할은 root 권한을 가진 사용자만 부여할 수 있습니다.`
           });
           continue;
         }
+
+        const deptResolved = await resolveOrgByName(
+          'dept',
+          row['부서'] ? row['부서'].toString() : '',
+          finalCompanyId
+        );
+        const posResolved = await resolveOrgByName(
+          'pos',
+          row['직책'] ? row['직책'].toString() : '',
+          finalCompanyId
+        );
 
         // 사용자 생성
         const user = await (User as any).create({
           tenant_id: tenantId,
           company_id: finalCompanyId,
-          userid: row['사용자ID'].toString().trim(),
+          userid,
           username: row['이름'].toString().trim(),
-          email: row['이메일'].toString().trim(),
+          email,
           password_hash: passwordHash,
           role: importRole,
-          department: row['부서'] ? row['부서'].toString().trim() : null,
-          position: row['직책'] ? row['직책'].toString().trim() : null,
+          department_id: deptResolved.id,
+          department: deptResolved.name,
+          position_id: posResolved.id,
+          position: posResolved.name,
           employee_number: employeeNumber || null,
           birth_date: row['생년월일 (YYYY-MM-DD)'] ? new Date(row['생년월일 (YYYY-MM-DD)'].toString()) : null,
           gender: (row['성별 (male/female/other)'] && ['male', 'female', 'other'].includes(row['성별 (male/female/other)'].toString().toLowerCase()))

@@ -5,12 +5,14 @@ import {
   createPayroll,
   bulkGeneratePayrolls,
   previewBulkPayrollGeneration,
+  importPayrollsFromRows,
   updatePayroll,
   deletePayroll,
   approvePayroll,
   payPayroll,
   sendPayrollPayslip,
   sendImportedPayslip,
+  getMyPayrolls,
   getMyPayslips,
   downloadMyPayslip,
   getPayrollPeriodLocks,
@@ -158,6 +160,16 @@ router.post(
   }),
   bulkGeneratePayrolls
 );
+router.post(
+  '/payrolls/bulk-import',
+  restrictAuditToReadOnly,
+  validateBody({
+    payroll_period: { required: true, type: 'string', minLength: 1, maxLength: 20 },
+    replace_matched: { type: 'boolean' },
+    rows: { required: true, type: 'array' }
+  }),
+  importPayrollsFromRows
+);
 router.get('/payrolls/:id', getPayroll);
 router.post(
   '/payrolls/:id/send-payslip',
@@ -182,6 +194,7 @@ router.post(
   }),
   sendImportedPayslip
 );
+router.get('/my/payrolls', getMyPayrolls);
 router.get('/my/payslips', getMyPayslips);
 router.get('/my/payslips/:id/download', downloadMyPayslip);
 router.post(

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { RequestWithUser } from '../types';
-import { Invoice, InvoiceItem, Customer, ExpenseReport, Budget, Asset, Company, Approval, User, RoomBooking } from '../models';
+import { Invoice, InvoiceItem, Customer, ExpenseReport, Budget, Asset, Company, Approval, User, RoomBooking, Department, Position } from '../models';
 import { Op, Sequelize, QueryTypes } from 'sequelize';
 import sequelize from '../config/database';
 import nodemailer from 'nodemailer';
@@ -2108,6 +2108,43 @@ export const getAccountingStats = async (req: RequestWithUser, res: Response) =>
   }
 };
 
+/** 신청자 부서/직책: 요청값 → User.department/position → department_id/position_id 마스터명 */
+const resolveRequesterOrgLabels = async (
+  requesterId: number,
+  requestedDepartment?: string | null,
+  requestedPosition?: string | null
+): Promise<{ department: string | null; position: string | null }> => {
+  let department = String(requestedDepartment || '').trim();
+  let position = String(requestedPosition || '').trim();
+  if (department && position) {
+    return { department, position };
+  }
+  try {
+    const u = await (User as any).findByPk(requesterId, {
+      attributes: ['id', 'department', 'position', 'department_id', 'position_id'],
+    });
+    if (!u) {
+      return { department: department || null, position: position || null };
+    }
+    if (!department) department = String(u.department || '').trim();
+    if (!position) position = String(u.position || '').trim();
+    if (!department && u.department_id) {
+      const dept = await (Department as any).findByPk(u.department_id, { attributes: ['id', 'name'] });
+      department = String(dept?.name || '').trim();
+    }
+    if (!position && u.position_id) {
+      const pos = await (Position as any).findByPk(u.position_id, { attributes: ['id', 'name'] });
+      position = String(pos?.name || '').trim();
+    }
+  } catch (err) {
+    console.warn('[expense] resolveRequesterOrgLabels failed:', (err as any)?.message || err);
+  }
+  return {
+    department: department || null,
+    position: position || null,
+  };
+};
+
 // 지출결의서 목록 조회
 export const getExpenseReports = async (req: RequestWithUser, res: Response) => {
   try {
@@ -2139,6 +2176,20 @@ export const getExpenseReports = async (req: RequestWithUser, res: Response) => 
       ? expenses.filter((row: any) => expenseMatchesAssignedScope(row, clientScope))
       : expenses;
 
+    const requesterIds = Array.from(
+      new Set(
+        scopedExpenses
+          .map((row: any) => Number(row.requester_id))
+          .filter((id: number) => Number.isFinite(id) && id > 0)
+      )
+    ) as number[];
+    const orgByRequester = new Map<number, { department: string | null; position: string | null }>();
+    await Promise.all(
+      requesterIds.map(async (rid) => {
+        orgByRequester.set(rid, await resolveRequesterOrgLabels(rid, null, null));
+      })
+    );
+
     res.json({
       success: true,
       data: scopedExpenses.map((row: any) => {
@@ -2146,6 +2197,15 @@ export const getExpenseReports = async (req: RequestWithUser, res: Response) => 
         const company = row?.company || data.company;
         if (company?.name) data.company_name = company.name;
         if (data.company) delete data.company;
+        const org = orgByRequester.get(Number(data.requester_id));
+        if (org) {
+          if (!String(data.requester_department || '').trim() && org.department) {
+            data.requester_department = org.department;
+          }
+          if (!String(data.requester_position || '').trim() && org.position) {
+            data.requester_position = org.position;
+          }
+        }
         return data;
       }),
     });
@@ -2173,6 +2233,22 @@ export const getExpenseReportById = async (req: RequestWithUser, res: Response) 
     const data = sanitizeExpenseForUser(expense, req.user);
     if (expense.company?.name) data.company_name = expense.company.name;
     if (data.company) delete data.company;
+    if (
+      !String(data.requester_department || '').trim() ||
+      !String(data.requester_position || '').trim()
+    ) {
+      const org = await resolveRequesterOrgLabels(
+        Number(data.requester_id),
+        data.requester_department,
+        data.requester_position
+      );
+      if (!String(data.requester_department || '').trim() && org.department) {
+        data.requester_department = org.department;
+      }
+      if (!String(data.requester_position || '').trim() && org.position) {
+        data.requester_position = org.position;
+      }
+    }
     res.json({ success: true, data });
   } catch (error: any) {
     console.error('지출결의서 상세 조회 오류:', error);
@@ -2640,6 +2716,14 @@ export const createExpenseReport = async (req: RequestWithUser, res: Response) =
       return res.status(400).json({ success: false, message: '승인권자를 선택해주세요.' });
     }
 
+    const requesterOrg = await resolveRequesterOrgLabels(
+      requester_id,
+      requester_department,
+      requester_position
+    );
+    const resolvedRequesterDepartment = requesterOrg.department;
+    const resolvedRequesterPosition = requesterOrg.position;
+
     const expense = await (ExpenseReport as any).create({
       tenant_id,
       company_id,
@@ -2647,8 +2731,8 @@ export const createExpenseReport = async (req: RequestWithUser, res: Response) =
       title: safeTitle,
       requester_id,
       requester_name: requester_name || req.user.username,
-      requester_department,
-      requester_position,
+      requester_department: resolvedRequesterDepartment,
+      requester_position: resolvedRequesterPosition,
       total_amount,
       currency: 'INR',
       purpose: safePurpose,

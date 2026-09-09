@@ -1142,6 +1142,302 @@ export const sendImportedPayslip = async (req: RequestWithUser, res: Response) =
   }
 };
 
+function toMoneyNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const n = Number(String(value ?? '').replace(/,/g, '').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** 엑셀 파싱 행을 payrolls 테이블에 일괄 저장 (이메일·사번 매칭) */
+export const importPayrollsFromRows = async (req: RequestWithUser, res: Response) => {
+  try {
+    const { tenant_id, company_id, id: user_id } = req.user;
+    const payroll_period = normalizePayrollPeriodInput(String(req.body?.payroll_period || '').trim());
+    if (!payroll_period) {
+      return res.status(400).json({
+        success: false,
+        message: '급여 기간(payroll_period)이 필요하며 YYYY-MM 형식이어야 합니다.'
+      });
+    }
+
+    if (!parsePayrollPeriod(payroll_period)) {
+      return res.status(400).json({
+        success: false,
+        message: '급여 기간은 YYYY-MM 형식이어야 합니다.'
+      });
+    }
+
+    if (isPayrollPeriodAfterCurrentMonth(payroll_period)) {
+      return res.status(400).json({
+        success: false,
+        message: '아직 도래하지 않은 급여 월은 생성할 수 없습니다.'
+      });
+    }
+
+    if (await isPayrollPeriodLocked(tenant_id, company_id, payroll_period)) {
+      return res.status(403).json({
+        success: false,
+        message: '해당 급여 월은 확정되어 일괄 생성할 수 없습니다.'
+      });
+    }
+
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!rows.length) {
+      return res.status(400).json({
+        success: false,
+        message: '가져올 급여 행(rows)이 없습니다.'
+      });
+    }
+
+    const replaceMatched = req.body?.replace_matched !== false;
+
+    const employees = await (User as any).findAll({
+      where: { tenant_id, company_id, status: 'active' },
+      attributes: [
+        'id',
+        'username',
+        'email',
+        'department',
+        'position',
+        'employee_number',
+        'birth_date',
+        'hire_date'
+      ]
+    });
+
+    const byEmail = new Map<string, any>();
+    const byEmpNo = new Map<string, any>();
+    for (const emp of employees) {
+      const email = String(emp.email || '')
+        .trim()
+        .toLowerCase();
+      if (email && !byEmail.has(email)) byEmail.set(email, emp);
+      const empNo = String(emp.employee_number || '')
+        .trim()
+        .toLowerCase();
+      if (empNo && !byEmpNo.has(empNo)) byEmpNo.set(empNo, emp);
+    }
+
+    type SkippedRow = { row: number; email: string; reason: string };
+    const skipped: SkippedRow[] = [];
+    const matchedPayloads: Array<{
+      employee: any;
+      rowIndex: number;
+      email: string;
+      empId: string;
+      employeeName: string;
+      basic_salary: number;
+      overtime_pay: number;
+      bonus: number;
+      allowances: number;
+      deductions: number;
+      gross_salary: number;
+      net_salary: number;
+      tax_amount: number;
+      extra_fields: Record<string, unknown>;
+    }> = [];
+    const matchedEmployeeIds = new Set<number>();
+
+    rows.forEach((raw: any, index: number) => {
+      const rowNum = index + 1;
+      const email = String(raw?.employee_email || '')
+        .trim()
+        .toLowerCase();
+      const empId = String(raw?.emp_id || '').trim();
+      const empIdKey = empId.toLowerCase();
+
+      let employee: any = null;
+      if (email) employee = byEmail.get(email) || null;
+      if (!employee && empIdKey) employee = byEmpNo.get(empIdKey) || null;
+
+      if (!employee) {
+        skipped.push({
+          row: rowNum,
+          email: email || empId || '',
+          reason: !email && !empId ? 'missing_email_and_emp_id' : 'no_matching_user'
+        });
+        return;
+      }
+
+      if (matchedEmployeeIds.has(employee.id)) {
+        skipped.push({
+          row: rowNum,
+          email: email || String(employee.email || ''),
+          reason: 'duplicate_employee'
+        });
+        return;
+      }
+      matchedEmployeeIds.add(employee.id);
+
+      const basic_salary = toMoneyNumber(raw?.basic_salary);
+      const overtime_pay = toMoneyNumber(raw?.overtime_pay);
+      const bonus = toMoneyNumber(raw?.bonus);
+      const allowances = toMoneyNumber(raw?.allowances);
+      const deductions = toMoneyNumber(raw?.deductions);
+      const gross_salary = toMoneyNumber(raw?.gross_salary);
+      const net_salary = toMoneyNumber(raw?.net_salary);
+      const tax_amount = toMoneyNumber(raw?.tax_amount);
+      const employeeName =
+        String(raw?.employee_name || '').trim() || String(employee.username || '').trim();
+
+      const incomingExtra =
+        raw?.extra_fields && typeof raw.extra_fields === 'object' && !Array.isArray(raw.extra_fields)
+          ? { ...(raw.extra_fields as Record<string, unknown>) }
+          : {};
+
+      const birth = employee.birth_date ? String(employee.birth_date).split('T')[0] : '';
+      const hire = employee.hire_date ? String(employee.hire_date).split('T')[0] : '';
+
+      const extra_fields: Record<string, unknown> = {
+        ...incomingExtra,
+        emp_id: empId || String(employee.employee_number || '').trim() || incomingExtra.emp_id || '',
+        employee_email: email || String(employee.email || '').trim().toLowerCase(),
+        employee_name: employeeName,
+        department:
+          String(raw?.department || incomingExtra.department || employee.department || '').trim(),
+        position: String(raw?.position || incomingExtra.position || employee.position || '').trim(),
+        birth_date: String(incomingExtra.birth_date || birth || ''),
+        joining_date: String(incomingExtra.joining_date || hire || ''),
+        working_month: payroll_period,
+        import_source: 'excel_bulk_import'
+      };
+
+      matchedPayloads.push({
+        employee,
+        rowIndex: rowNum,
+        email: String(extra_fields.employee_email),
+        empId: String(extra_fields.emp_id),
+        employeeName,
+        basic_salary,
+        overtime_pay,
+        bonus,
+        allowances,
+        deductions,
+        gross_salary,
+        net_salary,
+        tax_amount,
+        extra_fields
+      });
+    });
+
+    const employeeIds = matchedPayloads.map((m) => m.employee.id);
+    let replaced = 0;
+
+    const created = await sequelize.transaction(async (transaction) => {
+      if (replaceMatched && employeeIds.length > 0) {
+        const [deactivated] = await (Payroll as any).update(
+          { is_active: false },
+          {
+            where: {
+              tenant_id,
+              company_id,
+              is_active: true,
+              employee_id: { [Op.in]: employeeIds },
+              ...sameMonthPayrollPeriodWhere(payroll_period)
+            },
+            transaction
+          }
+        );
+        replaced = Number(deactivated) || 0;
+      }
+
+      let createdCount = 0;
+      for (const item of matchedPayloads) {
+        await (Payroll as any).create(
+          {
+            tenant_id,
+            company_id,
+            employee_id: item.employee.id,
+            payroll_period,
+            basic_salary: item.basic_salary,
+            overtime_pay: item.overtime_pay,
+            bonus: item.bonus,
+            allowances: item.allowances,
+            deductions: item.deductions,
+            gross_salary: item.gross_salary,
+            net_salary: item.net_salary,
+            tax_amount: item.tax_amount,
+            status: 'pending',
+            created_by: user_id,
+            is_active: true,
+            extra_fields: item.extra_fields
+          },
+          { transaction }
+        );
+        createdCount += 1;
+      }
+      return createdCount;
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `급여 ${created}건을 가져왔습니다.${replaced > 0 ? ` (기존 ${replaced}건 비활성화)` : ''}${
+        skipped.length ? ` / 건너뜀 ${skipped.length}건` : ''
+      }`,
+      data: {
+        created,
+        replaced,
+        skipped,
+        matched: matchedPayloads.length
+      }
+    });
+  } catch (error) {
+    console.error('급여 엑셀 일괄 가져오기 오류:', error);
+    return res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+};
+
+/** 로그인한 직원 본인의 급여 목록 (employee_id = 본인) */
+export const getMyPayrolls = async (req: RequestWithUser, res: Response) => {
+  try {
+    const { tenant_id, company_id, id: userId } = req.user;
+    const period = String(req.query?.period || '').trim();
+    const periodNorm = period ? normalizePayrollPeriodInput(period) : '';
+
+    const where: any = {
+      tenant_id,
+      company_id,
+      employee_id: userId,
+      is_active: true
+    };
+    if (periodNorm) {
+      Object.assign(where, sameMonthPayrollPeriodWhere(periodNorm));
+    } else if (period) {
+      where.payroll_period = period;
+    }
+
+    const rows = await (Payroll as any).findAll({
+      where,
+      order: [
+        ['payroll_period', 'DESC'],
+        ['created_at', 'DESC'],
+        ['id', 'DESC']
+      ],
+      attributes: [
+        'id',
+        'payroll_period',
+        'basic_salary',
+        'overtime_pay',
+        'bonus',
+        'allowances',
+        'deductions',
+        'gross_salary',
+        'net_salary',
+        'tax_amount',
+        'status',
+        'payment_date',
+        'extra_fields',
+        'created_at'
+      ]
+    });
+
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('내 급여 목록 오류:', error);
+    return res.status(500).json({ success: false, message: '급여 목록을 불러오지 못했습니다.' });
+  }
+};
+
 /** 로그인한 사용자 본인의 발송 급여 명세서 목록 (메일 또는 user_id) */
 export const getMyPayslips = async (req: RequestWithUser, res: Response) => {
   try {

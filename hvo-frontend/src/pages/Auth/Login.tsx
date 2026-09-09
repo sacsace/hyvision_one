@@ -35,6 +35,8 @@ import {
   rememberUserid,
 } from '../../utils/webauthn';
 
+const LOGIN_HERO_VIDEO_SRC = '/media/Hyvision_India_Main_Video.mp4';
+
 const Login: React.FC = () => {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -85,6 +87,17 @@ const Login: React.FC = () => {
     setMenuLanguage(lang);
     void ensureI18nLanguage(lang);
   }, [setMenuLanguage]);
+
+  useEffect(() => {
+    const id = 'login-hero-fonts';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap';
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -465,140 +478,221 @@ const Login: React.FC = () => {
   return (
     <Box
       sx={{
-        height: { xs: '100dvh', md: 'auto' },
-        minHeight: { xs: '100dvh', md: '100vh' },
-        maxHeight: { xs: '100dvh', md: 'none' },
-        display: 'flex',
-        flexDirection: { xs: 'column', md: 'row' },
-        bgcolor: '#FFFFFF',
         position: 'relative',
-        overflow: { xs: 'hidden', md: 'visible' },
+        height: { xs: '100dvh', md: '100vh' },
+        minHeight: { xs: '100dvh', md: '100vh' },
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        bgcolor: '#0A1628',
+        fontFamily: '"Source Sans 3", "Segoe UI", sans-serif',
+        '@keyframes loginHeroIn': {
+          from: { opacity: 0, transform: 'translateY(12px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
+        '@keyframes loginPanelIn': {
+          from: { opacity: 0, transform: 'translateX(16px)' },
+          to: { opacity: 1, transform: 'translateX(0)' },
+        },
       }}
     >
       <Box
+        aria-hidden
         sx={{
-          flex: { xs: '0 0 auto', md: '0 0 42%' },
-          bgcolor: '#163E63',
-          color: '#F8FAFC',
-          display: 'flex',
-          flexDirection: { xs: 'row', md: 'column' },
-          alignItems: { xs: 'center', md: 'stretch' },
-          justifyContent: { xs: 'flex-start', md: 'flex-end' },
-          gap: { xs: 1.25, md: 0 },
-          px: { xs: 2, sm: 4, md: 5 },
-          py: { xs: 1.25, md: 5 },
-          borderRight: { md: '1px solid #112F4B' },
-          borderBottom: { xs: '1px solid #112F4B', md: 'none' },
-          minHeight: { xs: 'auto', md: '100vh' },
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          overflow: 'hidden',
+          '& video': {
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            display: 'block',
+          },
         }}
       >
-        <Typography
-          component="p"
+        <Box
+          component="video"
+          src={LOGIN_HERO_VIDEO_SRC}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        />
+        <Box
           sx={{
-            fontSize: { xs: '1.25rem', md: '2.75rem' },
-            fontWeight: 800,
-            letterSpacing: '-0.04em',
-            lineHeight: 1.05,
-            color: '#FFFFFF',
-            mb: { xs: 0, md: 0.75 },
-            flexShrink: 0,
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(90deg, rgba(6,14,28,0.88) 0%, rgba(6,14,28,0.62) 42%, rgba(6,14,28,0.45) 70%, rgba(6,14,28,0.55) 100%)',
           }}
-        >
-          {t('login.brandName')}
-        </Typography>
-        <Typography
+        />
+        <Box
           sx={{
-            fontSize: { xs: '0.75rem', md: '0.9375rem' },
-            fontWeight: 500,
-            color: alpha('#F8FAFC', 0.78),
-            letterSpacing: '-0.01em',
-            maxWidth: { xs: 'none', md: 280 },
-            lineHeight: 1.3,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: { xs: 'nowrap', md: 'normal' },
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(6,14,28,0.35) 0%, transparent 28%, transparent 72%, rgba(6,14,28,0.55) 100%)',
           }}
-        >
-          {t('login.brandTagline')}
-        </Typography>
+        />
       </Box>
 
       <Box
         sx={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minWidth: 0,
-          minHeight: 0,
-          bgcolor: '#F1F5F9',
+          position: 'absolute',
+          top: { xs: 10, sm: 18 },
+          right: { xs: 10, sm: 18 },
+          zIndex: 3,
+        }}
+      >
+        <ToggleButtonGroup
+          exclusive
+          value={i18n.language?.startsWith('en') ? 'en' : 'ko'}
+          onChange={handleLoginLanguage}
+          aria-label={t('login.languageToggleAria')}
+          sx={{
+            bgcolor: alpha('#0B1220', 0.55),
+            backdropFilter: 'blur(8px)',
+            p: 0.2,
+            borderRadius: '4px',
+            border: `1px solid ${alpha('#FFFFFF', 0.22)}`,
+            boxShadow: 'none',
+            '& .MuiToggleButtonGroup-grouped': {
+              border: 0,
+              mx: 0.1,
+              borderRadius: '2px !important',
+              px: { xs: 1.1, sm: 1.5 },
+              py: { xs: 0.3, sm: 0.45 },
+              fontSize: { xs: '0.75rem', sm: '0.8125rem' },
+              fontWeight: 600,
+              textTransform: 'none',
+              color: alpha('#F8FAFC', 0.78),
+              '&.Mui-selected': {
+                bgcolor: alpha('#FFFFFF', 0.16),
+                color: '#FFFFFF',
+                '&:hover': { bgcolor: alpha('#FFFFFF', 0.22) },
+              },
+            },
+          }}
+        >
+          <ToggleButton value="en" disableRipple>
+            {t('login.langEn')}
+          </ToggleButton>
+          <ToggleButton value="ko" disableRipple>
+            {t('login.langKo')}
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      <Box
+        sx={{
           position: 'relative',
+          zIndex: 1,
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          alignItems: { xs: 'stretch', md: 'center' },
+          justifyContent: 'center',
+          px: { xs: 2, sm: 3, md: 4 },
+          py: { xs: 7, sm: 8, md: 5 },
+          overflowY: { xs: 'auto', md: 'hidden' },
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         <Box
           sx={{
-            position: 'absolute',
-            top: { xs: 8, sm: 18 },
-            right: { xs: 8, sm: 18 },
-            zIndex: 2,
+            width: '100%',
+            maxWidth: { xs: '100%', md: 1080, lg: 1120 },
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 360px' },
+            alignItems: { xs: 'stretch', md: 'center' },
+            columnGap: { md: 4, lg: 5 },
+            rowGap: { xs: 2, md: 0 },
           }}
         >
-          <ToggleButtonGroup
-            exclusive
-            value={i18n.language?.startsWith('en') ? 'en' : 'ko'}
-            onChange={handleLoginLanguage}
-            aria-label={t('login.languageToggleAria')}
+        <Box
+          sx={{
+            color: '#F8FAFC',
+            maxWidth: { xs: '100%', md: 'none' },
+            minWidth: 0,
+            pt: { xs: 0.5, md: 0 },
+            animation: 'loginHeroIn 700ms ease-out both',
+          }}
+        >
+          <Box
             sx={{
-              bgcolor: '#FFFFFF',
-              p: 0.2,
-              borderRadius: '4px',
-              border: '1px solid #B4B4B4',
-              boxShadow: 'none',
-              '& .MuiToggleButtonGroup-grouped': {
-                border: 0,
-                mx: 0.1,
-                borderRadius: '2px !important',
-                px: { xs: 1.1, sm: 1.5 },
-                py: { xs: 0.3, sm: 0.45 },
-                fontSize: { xs: '0.75rem', sm: '0.8125rem' },
-                fontWeight: 600,
-                textTransform: 'none',
-                color: 'text.secondary',
-                '&.Mui-selected': {
-                  bgcolor: '#E2E8F0',
-                  color: '#0F172A',
-                  '&:hover': { bgcolor: '#CBD5E1' },
-                },
-              },
+              display: 'inline-block',
+              bgcolor: '#0B3A7A',
+              color: '#FFFFFF',
+              px: { xs: 1.25, sm: 1.5 },
+              py: { xs: 0.55, sm: 0.7 },
+              mb: { xs: 2, md: 2.75 },
+              fontSize: { xs: '0.6875rem', sm: '0.75rem' },
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              lineHeight: 1.25,
+              textTransform: 'uppercase',
+              fontFamily: '"Space Grotesk", "Source Sans 3", sans-serif',
             }}
           >
-            <ToggleButton value="en" disableRipple>
-              {t('login.langEn')}
-            </ToggleButton>
-            <ToggleButton value="ko" disableRipple>
-              {t('login.langKo')}
-            </ToggleButton>
-          </ToggleButtonGroup>
+            {t('login.heroCompany')}
+          </Box>
+          <Typography
+            component="h1"
+            sx={{
+              fontFamily: '"Space Grotesk", "Source Sans 3", sans-serif',
+              fontSize: { xs: '1.75rem', sm: '2.35rem', md: '3rem', lg: '3.35rem' },
+              fontWeight: 700,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.08,
+              color: '#FFFFFF',
+              mb: { xs: 1.25, md: 1.75 },
+              maxWidth: { xs: '100%', md: 560 },
+              animation: 'loginHeroIn 850ms ease-out 80ms both',
+            }}
+          >
+            {t('login.heroHeadline')}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: { xs: '0.875rem', sm: '1rem', md: '1.0625rem' },
+              fontWeight: 400,
+              color: alpha('#F8FAFC', 0.82),
+              letterSpacing: '-0.01em',
+              lineHeight: 1.55,
+              maxWidth: 520,
+              animation: 'loginHeroIn 900ms ease-out 140ms both',
+            }}
+          >
+            {t('login.heroSubtext')}
+          </Typography>
         </Box>
 
         <Box
           sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            px: { xs: 2, sm: 4 },
-            py: { xs: 2, sm: 5 },
-            overflowY: { xs: 'auto', md: 'visible' },
-            WebkitOverflowScrolling: 'touch',
+            width: '100%',
+            maxWidth: { xs: controlWidth + 40, md: '100%' },
+            justifySelf: { xs: 'center', md: 'stretch' },
+            animation: { xs: 'loginHeroIn 700ms ease-out 120ms both', md: 'loginPanelIn 650ms ease-out 120ms both' },
           }}
         >
-          <Box sx={{ width: '100%', maxWidth: controlWidth }}>
+          <Box
+            sx={{
+              bgcolor: alpha('#FFFFFF', 0.96),
+              border: '1px solid #CBD5E1',
+              borderRadius: '6px',
+              px: { xs: 2, sm: 2.5 },
+              py: { xs: 2, sm: 2.5 },
+              boxShadow: '0 12px 40px rgba(0,0,0,0.28)',
+            }}
+          >
             <Box
               sx={{
                 display: 'flex',
                 justifyContent: 'center',
-                mb: { xs: 1.5, sm: 2.25 },
+                mb: { xs: 1.5, sm: 2 },
               }}
             >
               <Box
@@ -606,7 +700,7 @@ const Login: React.FC = () => {
                 src="/hyvision-logo.png"
                 alt={t('login.brandName')}
                 sx={{
-                  height: { xs: 48, sm: 56 },
+                  height: { xs: 44, sm: 52 },
                   width: 'auto',
                   maxWidth: '100%',
                   objectFit: 'contain',
@@ -615,11 +709,23 @@ const Login: React.FC = () => {
               />
             </Box>
 
+            <Typography
+              sx={{
+                textAlign: 'center',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: 'text.secondary',
+                mb: { xs: 1.5, sm: 2 },
+              }}
+            >
+              {t('login.signIn')}
+            </Typography>
+
             {error && (
               <Alert
                 severity="error"
                 sx={{
-                  mb: { xs: 1.25, sm: 2 },
+                  mb: { xs: 1.25, sm: 1.75 },
                   borderRadius: '4px',
                   fontSize: '0.8125rem',
                   boxShadow: 'none',
@@ -742,111 +848,93 @@ const Login: React.FC = () => {
               )}
 
               {!isSingleCompanyMode() && (
-              <Button
-                fullWidth
-                variant="text"
-                onClick={() => {
-                  setSignupOpen(true);
-                  setSignupStep('form');
-                  setSignupError('');
-                  setSignupSuccess('');
-                  setSignupResult(null);
-                }}
+                <Button
+                  fullWidth
+                  variant="text"
+                  onClick={() => {
+                    setSignupOpen(true);
+                    setSignupStep('form');
+                    setSignupError('');
+                    setSignupSuccess('');
+                    setSignupResult(null);
+                  }}
+                  sx={{
+                    mt: { xs: 0.35, sm: 0.75 },
+                    py: { xs: 0.5, sm: 0.75 },
+                    minHeight: { xs: 32, sm: 36 },
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    color: 'text.secondary',
+                    textTransform: 'none',
+                    borderRadius: '4px',
+                    '&:hover': { bgcolor: 'transparent', color: 'primary.main', textDecoration: 'underline' },
+                  }}
+                >
+                  {t('login.signUpCta')}
+                </Button>
+              )}
+            </Box>
+
+            <Box
+              sx={{
+                mt: { xs: 1.5, sm: 2 },
+                pt: { xs: 1.25, sm: 1.5 },
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 0.5,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                {[
+                  { to: '/legal/terms', label: t('login.footerTerms') },
+                  { to: '/legal/privacy', label: t('login.footerPrivacy') },
+                  { to: '/legal/support', label: t('login.footerSupport') },
+                ].map((link, index) => (
+                  <React.Fragment key={link.to}>
+                    {index > 0 && (
+                      <Typography variant="caption" sx={{ color: alpha(theme.palette.text.secondary, 0.45), fontSize: '0.6875rem' }}>
+                        ·
+                      </Typography>
+                    )}
+                    <Typography
+                      component={RouterLink}
+                      to={link.to}
+                      variant="caption"
+                      sx={{
+                        color: alpha(theme.palette.text.secondary, 0.82),
+                        fontSize: '0.6875rem',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        whiteSpace: 'nowrap',
+                        '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+                      }}
+                    >
+                      {link.label}
+                    </Typography>
+                  </React.Fragment>
+                ))}
+              </Box>
+              <Typography
+                component="a"
+                href={t('login.footerDeveloperUrl')}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="caption"
                 sx={{
-                  mt: { xs: 0.35, sm: 0.75 },
-                  py: { xs: 0.5, sm: 0.75 },
-                  minHeight: { xs: 32, sm: 36 },
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  color: 'text.secondary',
-                  textTransform: 'none',
-                  borderRadius: '4px',
-                  '&:hover': { bgcolor: 'transparent', color: 'primary.main', textDecoration: 'underline' },
+                  color: alpha(theme.palette.text.secondary, 0.7),
+                  fontSize: '0.6875rem',
+                  whiteSpace: 'nowrap',
+                  textDecoration: 'none',
+                  '&:hover': { color: 'primary.main', textDecoration: 'underline' },
                 }}
               >
-                {t('login.signUpCta')}
-              </Button>
-              )}
+                {t('login.footerDevelopedBy')}
+              </Typography>
             </Box>
           </Box>
         </Box>
-
-        <Box
-          sx={{
-            flex: '0 0 auto',
-            px: { xs: 2, sm: 4 },
-            pb: { xs: 1, sm: 2 },
-            pt: { xs: 0.75, sm: 1 },
-            borderTop: '1px solid #E2E8F0',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: { xs: 0.25, sm: 0.5 },
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-            {[
-              { to: '/legal/terms', label: t('login.footerTerms') },
-              { to: '/legal/privacy', label: t('login.footerPrivacy') },
-              { to: '/legal/support', label: t('login.footerSupport') },
-            ].map((link, index) => (
-              <React.Fragment key={link.to}>
-                {index > 0 && (
-                  <Typography variant="caption" sx={{ color: alpha(theme.palette.text.secondary, 0.45), fontSize: '0.6875rem' }}>
-                    ·
-                  </Typography>
-                )}
-                <Typography
-                  component={RouterLink}
-                  to={link.to}
-                  variant="caption"
-                  sx={{
-                    color: alpha(theme.palette.text.secondary, 0.82),
-                    fontSize: '0.6875rem',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                    '&:hover': { color: 'primary.main', textDecoration: 'underline' },
-                  }}
-                >
-                  {link.label}
-                </Typography>
-              </React.Fragment>
-            ))}
-          </Box>
-          <Box
-            sx={{
-              display: { xs: 'none', sm: 'flex' },
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 0.75,
-              flexWrap: 'wrap',
-            }}
-          >
-            <Typography variant="caption" sx={{ color: alpha(theme.palette.text.secondary, 0.7), fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
-              {t('login.footerDevelopedBy')}
-            </Typography>
-            <Typography variant="caption" sx={{ color: alpha(theme.palette.text.secondary, 0.45), fontSize: '0.6875rem' }}>
-              ·
-            </Typography>
-            <Typography variant="caption" sx={{ color: alpha(theme.palette.text.secondary, 0.7), fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
-              {t('login.footerCompanyName')}
-            </Typography>
-            <Typography variant="caption" sx={{ color: alpha(theme.palette.text.secondary, 0.45), fontSize: '0.6875rem' }}>
-              ·
-            </Typography>
-            <Typography
-              component="span"
-              variant="caption"
-              sx={{
-                color: alpha(theme.palette.text.secondary, 0.7),
-                fontSize: '0.6875rem',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {t('login.footerWebsite')}
-            </Typography>
-          </Box>
         </Box>
       </Box>
 

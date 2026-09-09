@@ -17,3 +17,4 @@ export * from './domains/sales';
 export * from './domains/hotel';
 export * from './domains/mfg';
 export * from './domains/hqPortal';
+export * from './domains/companyPolicies';

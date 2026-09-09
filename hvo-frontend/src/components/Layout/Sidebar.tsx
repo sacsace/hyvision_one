@@ -567,6 +567,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (normalized.includes('/my/attendance')) return <Schedule />;
     if (normalized.includes('/my/leave')) return <BeachAccess />;
     if (normalized.includes('/my/payslips')) return <Payments />;
+    if (normalized.includes('/my/payroll-list')) return <ReceiptLong />;
     if (normalized.includes('/my/contracts')) return <Description />;
     if (normalized.includes('/my/notices') || normalized.includes('/communication/notice')) {
       return <Campaign />;

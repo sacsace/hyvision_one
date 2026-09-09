@@ -36,6 +36,7 @@ import {
   Campaign,
   Assignment,
   ListAlt,
+  Policy,
 } from '@mui/icons-material';
 import type { Menu } from '../../services/menuService';
 import { isRemovedNavMenuRoute } from '../../utils/isRemovedNavMenuRoute';
@@ -246,6 +247,7 @@ const ICON_BY_NAME: Record<string, React.ReactElement> = {
   payments: <Payments />,
   campaign: <Campaign />,
   assignment: <Assignment />,
+  policy: <Policy />,
   list_alt: <ListAlt />,
   category: <Category />,
   view_kanban: <ViewKanban />,
@@ -316,11 +318,13 @@ const getIconByRoute = (route: string): React.ReactElement | null => {
   if (normalized.includes('/my/attendance')) return <Schedule />;
   if (normalized.includes('/my/leave')) return <BeachAccess />;
   if (normalized.includes('/my/payslips')) return <Payments />;
+  if (normalized.includes('/my/payroll-list')) return <ReceiptLong />;
   if (normalized.includes('/my/contracts')) return <Description />;
   if (normalized.includes('/my/notices') || normalized.includes('/communication/notice')) {
     return <Campaign />;
   }
   if (normalized.includes('/my/work-list')) return <Assignment />;
+  if (normalized.includes('/my/company-policies')) return <Policy />;
   if (normalized.includes('/my/mail-settings')) return <Settings />;
   if (normalized === '/my' || normalized.startsWith('/my/')) return <Person />;
   if (normalized.includes('/communication/desktop-notifier')) return <Download />;

@@ -32,6 +32,7 @@ import systemBootstrapRoutes from './routes/systemBootstrap';
 import dashboardRoutes from './routes/dashboardRoutes';
 import mfgRoutes from './routes/mfg';
 import hqRoutes from './routes/hq';
+import companyPolicyRoutes from './routes/companyPolicies';
 import { authenticateToken } from './middleware/auth';
 import { startAttendanceAutoCheckoutScheduler } from './controllers/attendanceController';
 import SocketService from './services/socketService';
@@ -350,6 +351,7 @@ app.use('/api/login-info', loginInfoRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/system', systemBootstrapRoutes);
 app.use('/api/dashboard', authenticateToken, dashboardRoutes);
+app.use('/api/company-policies', companyPolicyRoutes);
 
 // 404 핸들러
 app.use('*', (req, res) => {

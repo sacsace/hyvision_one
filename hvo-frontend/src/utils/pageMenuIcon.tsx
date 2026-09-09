@@ -21,6 +21,7 @@ import {
   Payments,
   People,
   Person,
+  Policy,
   PostAdd,
   Psychology,
   QrCodeScanner,
@@ -56,6 +57,7 @@ const MENU_ICON_MAP: Record<string, React.ReactElement> = {
   payments: <Payments />,
   campaign: <Campaign />,
   assignment: <Assignment />,
+  policy: <Policy />,
   category: <Category />,
   view_kanban: <ViewKanban />,
   move_to_inbox: <MoveToInbox />,
@@ -134,9 +136,11 @@ export function getPageIconByRoute(route: string): React.ReactElement | null {
   if (normalized.includes('/my/attendance')) return <Schedule />;
   if (normalized.includes('/my/leave')) return <BeachAccess />;
   if (normalized.includes('/my/payslips')) return <Payments />;
+  if (normalized.includes('/my/payroll-list')) return <ReceiptLong />;
   if (normalized.includes('/my/contracts')) return <Description />;
   if (normalized.includes('/my/notices') || normalized.includes('/notice')) return <Campaign />;
   if (normalized.includes('/my/work-list')) return <Assignment />;
+  if (normalized.includes('/my/company-policies')) return <Policy />;
   if (normalized.includes('/my/mail-settings')) return <Settings />;
   if (normalized === '/my' || normalized.startsWith('/my/')) return <Person />;
   if (normalized.includes('/attendance')) return <Schedule />;

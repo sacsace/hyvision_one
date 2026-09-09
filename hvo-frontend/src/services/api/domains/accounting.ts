@@ -838,6 +838,37 @@ export const payrollService = {
     return response.data as Blob;
   },
 
+  /** 엑셀 파싱 행 → payrolls 일괄 저장 (이메일·사번 매칭) */
+  bulkImportPayrolls: async (data: {
+    payroll_period: string;
+    replace_matched?: boolean;
+    rows: Array<{
+      employee_email?: string;
+      emp_id?: string;
+      employee_name?: string;
+      department?: string;
+      position?: string;
+      basic_salary?: number;
+      overtime_pay?: number;
+      bonus?: number;
+      allowances?: number;
+      deductions?: number;
+      gross_salary?: number;
+      net_salary?: number;
+      tax_amount?: number;
+      extra_fields?: Record<string, unknown>;
+    }>;
+  }) => {
+    const response = await api.post('/hr/payrolls/bulk-import', data);
+    return response.data;
+  },
+
+  /** 본인 급여 목록 (employee_id 매칭) */
+  getMyPayrolls: async (params?: { period?: string }) => {
+    const response = await api.get('/hr/my/payrolls', { params });
+    return response.data;
+  },
+
   // 급여 ?�정
   updatePayroll: async (id: number, data: any) => {
     const response = await api.put(`/hr/payrolls/${id}`, data);

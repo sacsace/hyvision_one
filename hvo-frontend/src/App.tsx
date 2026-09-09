@@ -58,9 +58,11 @@ const MailSendTest = lazyPage(() => import('./pages/System/MailSendTest'));
 const LoginInfoManagement = lazyPage(() => import('./pages/System/LoginInfoManagement'));
 const NoticeManagement = lazyPage(() => import('./pages/Communication/NoticeManagement'));
 const MyPayslips = lazyPage(() => import('./pages/My/MyPayslips'));
+const MyPayrollList = lazyPage(() => import('./pages/My/MyPayrollList'));
 const MyMailSettings = lazyPage(() => import('./pages/My/MyMailSettings'));
 const MyWorkList = lazyPage(() => import('./pages/My/MyWorkList'));
 const MyPersonalInfo = lazyPage(() => import('./pages/My/MyPersonalInfo'));
+const MyCompanyPolicies = lazyPage(() => import('./pages/My/MyCompanyPolicies'));
 const NotificationManagement = lazyPage(() => import('./pages/Notifications/NotificationManagement'));
 const EmailManagement = lazyPage(() => import('./pages/Communication/EmailManagement'));
 const SMSManagement = lazyPage(() => import('./pages/Communication/SMSManagement'));
@@ -367,8 +369,10 @@ function App() {
             {/* 내 정보·업무 (셀프서비스) */}
             <Route path="my" element={<Navigate to="/my/personal-info" replace />} />
             <Route path="my/personal-info" element={<MyPersonalInfo />} />
+            <Route path="my/company-policies" element={<MyCompanyPolicies />} />
             <Route path="my/attendance" element={<AttendanceManagement />} />
             <Route path="my/payslips" element={<MyPayslips />} />
+            <Route path="my/payroll-list" element={<MyPayrollList />} />
             <Route path="my/contracts" element={<EmploymentContractManagement />} />
             <Route path="my/notices" element={<NoticeManagement />} />
             <Route path="my/leave" element={<VacationManagement />} />
