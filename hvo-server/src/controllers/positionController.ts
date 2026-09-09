@@ -77,7 +77,7 @@ async function ensureDefaultPositions(tenantId: number, companyId: number): Prom
 }
 
 /** 구 DB에 positions 테이블/컬럼이 없을 때 런타임 보정 */
-async function ensurePositionSchema(): Promise<void> {
+export async function ensurePositionSchema(): Promise<void> {
   try {
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS "positions" (

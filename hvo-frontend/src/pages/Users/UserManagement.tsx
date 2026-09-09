@@ -89,6 +89,7 @@ import { DepartmentManagementPanel } from '../HR/DepartmentManagement';
 import { PositionManagementPanel } from '../HR/PositionManagement';
 import { getUploadUrl } from '../../utils/uploadUrl';
 import { formatPositionLabel } from '../../utils/positionLabels';
+import { toPersonNameCase } from '../../utils/textCase';
 
 const USER_MGMT_MENU_ROUTES = ['/hr/users', '/users'];
 const USERS_PER_PAGE = 10;
@@ -1333,6 +1334,7 @@ const UserManagement: React.FC = () => {
       // 비밀번호가 없으면 기본값 설정 (신규 등록 시)
       const submitData: any = {
         ...formData,
+        username: toPersonNameCase(formData.username),
         password: formData.password || (editingUser ? undefined : 'default123')
       };
 
@@ -2664,6 +2666,12 @@ const UserManagement: React.FC = () => {
                       {...OUTLINED_FIELD}
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      onBlur={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          username: toPersonNameCase(prev.username),
+                        }))
+                      }
                       required
                     />
                     <TextField
@@ -4341,9 +4349,33 @@ const UserManagement: React.FC = () => {
                   {t('userManagement.importResultTitle')}
                 </Typography>
                 <Alert severity="success" sx={{ mb: 2 }}>
-                  {t('userManagement.importSuccessSummary', { total: importResult.total, success: importResult.success.length })}
+                  {t('userManagement.importSuccessSummary', {
+                    total: importResult.total,
+                    success: importResult.success?.length || 0,
+                  })}
                 </Alert>
-                {importResult.failed.length > 0 && (
+                {Array.isArray(importResult.skipped) && importResult.skipped.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" color="warning.main" gutterBottom>
+                      {t('userManagement.importSkippedCount', { count: importResult.skipped.length })}
+                    </Typography>
+                    <Box sx={{ maxHeight: 160, overflow: 'auto', mt: 1 }}>
+                      {importResult.skipped.map((item: any, index: number) => (
+                        <Alert key={`skip-${index}`} severity="warning" sx={{ mb: 1 }}>
+                          <Typography variant="body2">
+                            {t('userManagement.importRowError', { row: item.row, error: item.error })}
+                          </Typography>
+                          {item.data && (
+                            <Typography variant="caption" color="text.secondary">
+                              사용자ID: {item.data['사용자ID']}, 이메일: {item.data['이메일']}
+                            </Typography>
+                          )}
+                        </Alert>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+                {importResult.failed?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" color="error" gutterBottom>
                       {t('userManagement.importFailedCount', { count: importResult.failed.length })}

@@ -43,6 +43,7 @@ import { userService } from '../../services/api';
 import { useStore } from '../../store';
 import { getUploadUrl } from '../../utils/uploadUrl';
 import { formatPositionLabel } from '../../utils/positionLabels';
+import { toPersonNameCase } from '../../utils/textCase';
 
 type CareerEntry = {
   company_name: string;
@@ -410,7 +411,7 @@ const MyPersonalInfo: React.FC = () => {
     setMessage('');
     try {
       const response = await userService.updateMyProfile({
-        username: form.username.trim(),
+        username: toPersonNameCase(form.username),
         email: form.email.trim(),
         birth_date: form.birth_date || null,
         gender: form.gender || '',
@@ -592,6 +593,7 @@ const MyPersonalInfo: React.FC = () => {
                       label={t('personalSettings.name')}
                       value={form.username}
                       onChange={(e) => setFormField('username', e.target.value)}
+                      onBlur={() => setFormField('username', toPersonNameCase(form.username))}
                       required
                       size="small"
                       sx={fieldSx}

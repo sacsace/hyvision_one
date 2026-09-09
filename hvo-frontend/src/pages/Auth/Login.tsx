@@ -628,7 +628,7 @@ const Login: React.FC = () => {
               color: '#FFFFFF',
               px: { xs: 1.25, sm: 1.5 },
               py: { xs: 0.55, sm: 0.7 },
-              mb: { xs: 2, md: 2.75 },
+              mb: { xs: 1.5, md: 2 },
               fontSize: { xs: '0.6875rem', sm: '0.75rem' },
               fontWeight: 700,
               letterSpacing: '0.04em',
@@ -640,15 +640,43 @@ const Login: React.FC = () => {
             {t('login.heroCompany')}
           </Box>
           <Typography
+            component="p"
+            sx={{
+              fontFamily: '"Space Grotesk", "Source Sans 3", sans-serif',
+              fontSize: { xs: '1.75rem', sm: '2.35rem', md: '2.75rem' },
+              fontWeight: 800,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.05,
+              color: '#FFFFFF',
+              mb: 0.5,
+              animation: 'loginHeroIn 780ms ease-out 40ms both',
+            }}
+          >
+            {t('login.heroProductName')}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: { xs: '0.8125rem', sm: '0.9375rem' },
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: alpha('#93C5FD', 0.95),
+              mb: { xs: 1.75, md: 2.25 },
+              animation: 'loginHeroIn 820ms ease-out 60ms both',
+            }}
+          >
+            {t('login.heroProductLine')}
+          </Typography>
+          <Typography
             component="h1"
             sx={{
               fontFamily: '"Space Grotesk", "Source Sans 3", sans-serif',
-              fontSize: { xs: '1.75rem', sm: '2.35rem', md: '3rem', lg: '3.35rem' },
+              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem', lg: '2.75rem' },
               fontWeight: 700,
               letterSpacing: '-0.03em',
-              lineHeight: 1.08,
+              lineHeight: 1.12,
               color: '#FFFFFF',
-              mb: { xs: 1.25, md: 1.75 },
+              mb: { xs: 1.25, md: 1.5 },
               maxWidth: { xs: '100%', md: 560 },
               animation: 'loginHeroIn 850ms ease-out 80ms both',
             }}
@@ -712,13 +740,13 @@ const Login: React.FC = () => {
             <Typography
               sx={{
                 textAlign: 'center',
-                fontSize: '0.8125rem',
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 color: 'text.secondary',
                 mb: { xs: 1.5, sm: 2 },
               }}
             >
-              {t('login.signIn')}
+              {t('login.brandName')}
             </Typography>
 
             {error && (

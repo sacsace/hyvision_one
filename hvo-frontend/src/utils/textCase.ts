@@ -7,6 +7,22 @@ export function toSentenceCase(value: string | null | undefined): string {
   return s.slice(0, firstLetter) + s.charAt(firstLetter).toUpperCase() + s.slice(firstLetter + 1).toLowerCase();
 }
 
+/**
+ * 사람 이름: 공백·.·- 로 나뉜 각 조각의 첫 글자 대문자, 나머지 소문자.
+ * 예: "PRAKASH SAHU" → "Prakash Sahu", "SELVAM.S" → "Selvam.S"
+ */
+export function toPersonNameCase(value: string | null | undefined): string {
+  const text = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (!text) return '';
+  return text
+    .split(/(\s+|[-.])/)
+    .map((part) => {
+      if (!part || /^\s+$/.test(part) || part === '-' || part === '.') return part;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join('');
+}
+
 const hasHangul = (value: string) => /[\uAC00-\uD7A3]/.test(value);
 
 /**

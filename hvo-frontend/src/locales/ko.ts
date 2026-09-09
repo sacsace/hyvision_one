@@ -448,7 +448,7 @@ export default {
       excelExport: 'Excel 내보내기',
       excelImport: '일괄 등록',
       bulkRegisterHint:
-        '샘플 엑셀을 내려받아 작성한 뒤 업로드하면 여러 사용자를 한 번에 등록합니다. 필수: 사용자ID, 이름, 이메일, 비밀번호.',
+        '샘플 엑셀을 내려받아 작성한 뒤 업로드하면 여러 사용자를 한 번에 등록합니다. 필수: 사용자ID, 이름, 이메일, 비밀번호. 부서는 없으면 자동 등록되며, 이메일 중복 행은 제외됩니다.',
       search: '사용자명, 이메일, 사원번호 검색...',
       company: '회사',
       allCompanies: '전체',
@@ -617,11 +617,12 @@ export default {
       excelImportError: 'Excel 파일 가져오기 중 오류가 발생했습니다.',
       excelImportTitle: '신규 사용자 일괄 등록',
       excelImportDesc:
-        '샘플 양식과 동일한 엑셀(.xlsx)을 선택하세요. 부서·직책 이름이 마스터와 같으면 자동으로 연결됩니다.',
+        '샘플 양식과 동일한 엑셀(.xlsx)을 선택하세요. 부서·직책이 없으면 부서/직책 관리에 자동 등록됩니다. 이메일·사용자ID 중복 행은 제외하고 나머지만 등록합니다.',
       selectedFile: '선택된 파일',
       importResultTitle: '등록 결과',
       importSuccessSummary: '총 {{total}}건 중 {{success}}건 성공',
       importFailedCount: '실패: {{count}}건',
+      importSkippedCount: '중복 제외: {{count}}건',
       importRowError: '행 {{row}}: {{error}}',
       importing: '등록 중...',
       importButton: '일괄 등록',
@@ -4775,6 +4776,8 @@ export default {
       brandName: 'Hyvision One',
       brandTagline: 'Integrated ERP for Hyvision India',
       heroCompany: 'HyVISION SYSTEM INDIA PRIVATE LIMITED',
+      heroProductName: 'Hyvision One',
+      heroProductLine: 'System Integration · ERP',
       heroHeadline: "Leading India's Future of Manufacturing",
       heroSubtext:
         'Delivering high precision vision inspection and automation technology optimized for the Indian manufacturing environment.',

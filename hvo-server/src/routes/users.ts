@@ -2,8 +2,8 @@ import express from 'express';
 import { Op } from 'sequelize';
 import bcrypt from 'bcrypt';
 import { User, Company, Tenant, Department, Position } from '../models';
-import { resolveDepartmentFieldsForUser } from '../controllers/departmentController';
-import { resolvePositionFieldsForUser } from '../controllers/positionController';
+import { resolveDepartmentFieldsForUser, ensureDepartmentColumns } from '../controllers/departmentController';
+import { resolvePositionFieldsForUser, ensurePositionSchema } from '../controllers/positionController';
 import { authenticateToken } from '../middleware/auth';
 import { requireAdminRootOrUserMenuPermission } from '../middleware/menuPermission';
 import { getUserUiPreferences, patchUserUiPreferences } from '../controllers/userUiPreferencesController';
@@ -55,6 +55,92 @@ const USER_EXCEL_EXPORT_COL_WIDTHS = [
 // bcrypt를 사용한 비밀번호 해싱 함수 (authController와 동일)
 const hashPassword = async (password: string): Promise<string> => {
   return await bcrypt.hash(password, 10);
+};
+
+/**
+ * 사용자 생년월일/입사일 파싱.
+ * Excel 날짜 일련번호(예: 45717)를 `new Date("45717")`로 넣으면
+ * moment/Sequelize DATEONLY가 `45717-01-01`로 깨지므로 별도 처리한다.
+ */
+const parseUserDateOnly = (raw: unknown): string | null => {
+  if (raw == null || raw === '') return null;
+
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    const y = raw.getUTCFullYear();
+    if (y < 1900 || y > 2100) return null;
+    const m = String(raw.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(raw.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    // Excel serial date (대략 1900~2100년대)
+    if (raw > 20000 && raw < 80000) {
+      const parsed = (XLSX as any).SSF?.parse_date_code?.(raw);
+      if (parsed && parsed.y >= 1900 && parsed.y <= 2100) {
+        const m = String(parsed.m).padStart(2, '0');
+        const d = String(parsed.d).padStart(2, '0');
+        return `${parsed.y}-${m}-${d}`;
+      }
+      const utcMs = Date.UTC(1899, 11, 30) + Math.round(raw) * 86400000;
+      const dt = new Date(utcMs);
+      if (!Number.isNaN(dt.getTime())) {
+        const y = dt.getUTCFullYear();
+        if (y >= 1900 && y <= 2100) {
+          const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(dt.getUTCDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        }
+      }
+    }
+    return null;
+  }
+
+  const text = String(raw).trim();
+  if (!text || text === '**') return null;
+
+  // 순수 숫자 문자열도 Excel serial로 취급
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    return parseUserDateOnly(Number(text));
+  }
+
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const y = Number(iso[1]);
+    if (y < 1900 || y > 2100) return null;
+    return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  }
+
+  const slash = text.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+  if (slash) {
+    const y = Number(slash[3]);
+    if (y < 1900 || y > 2100) return null;
+    return `${slash[3]}-${slash[1].padStart(2, '0')}-${slash[2].padStart(2, '0')}`;
+  }
+
+  const dt = new Date(text);
+  if (!Number.isNaN(dt.getTime())) {
+    const y = dt.getFullYear();
+    if (y < 1900 || y > 2100) return null;
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  return null;
+};
+
+/** 사람 이름: 단어(공백·.·- 구분)마다 첫 글자 대문자, 나머지 소문자 */
+const normalizePersonName = (raw: unknown): string => {
+  const text = String(raw ?? '').trim().replace(/\s+/g, ' ');
+  if (!text) return '';
+  return text
+    .split(/(\s+|[-.])/)
+    .map((part) => {
+      if (!part || /^\s+$/.test(part) || part === '-' || part === '.') return part;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join('');
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -460,7 +546,7 @@ router.patch('/me/profile', async (req, res) => {
     const updateData: Record<string, unknown> = {};
 
     if (username !== undefined) {
-      const value = String(username).trim();
+      const value = normalizePersonName(username);
       if (!value || value.length > 100) {
         return res.status(400).json({ success: false, message: '이름을 올바르게 입력해주세요.' });
       }
@@ -484,7 +570,7 @@ router.patch('/me/profile', async (req, res) => {
       updateData.email = value;
     }
 
-    if (birth_date !== undefined) updateData.birth_date = birth_date || null;
+    if (birth_date !== undefined) updateData.birth_date = birth_date ? parseUserDateOnly(birth_date) : null;
     if (gender !== undefined) {
       if (gender && !['male', 'female', 'other'].includes(String(gender))) {
         return res.status(400).json({ success: false, message: '성별 값이 올바르지 않습니다.' });
@@ -1201,7 +1287,7 @@ router.post(
       tenant_id: targetTenantId,
       company_id: targetCompanyId,
       userid,
-      username,
+      username: normalizePersonName(username),
       email,
       password_hash,
       role: role || 'user',
@@ -1238,13 +1324,13 @@ router.post(
     } else if (position !== undefined) {
       userData.position = position || null;
     }
-    if (birth_date) userData.birth_date = birth_date;
+    if (birth_date) userData.birth_date = parseUserDateOnly(birth_date);
     if (gender) userData.gender = gender;
     if (phone !== undefined) userData.phone = phone || null;
     if (address !== undefined) userData.address = address || null;
     if (emergency_contact !== undefined) userData.emergency_contact = emergency_contact || null;
     if (emergency_phone !== undefined) userData.emergency_phone = emergency_phone || null;
-    if (hire_date) userData.hire_date = hire_date;
+    if (hire_date) userData.hire_date = parseUserDateOnly(hire_date);
     if (employment_type) userData.employment_type = employment_type;
     if (salary !== undefined && salary !== '') {
       const verified = await verifyCurrentUserPassword(req, (req.body as any).currentPassword);
@@ -1499,7 +1585,7 @@ router.put(
       effectiveCompanyId = nextCompanyId;
     }
 
-    if (username !== undefined) updateData.username = username;
+    if (username !== undefined) updateData.username = normalizePersonName(username);
     if (email !== undefined) updateData.email = email;
     if (userid !== undefined && currentUserRole === 'root') {
       updateData.userid = String(userid).trim();
@@ -1561,13 +1647,13 @@ router.put(
         updateData.employee_number = trimmedEmpNo || null;
       }
     }
-    if (birth_date !== undefined) updateData.birth_date = birth_date || null;
+    if (birth_date !== undefined) updateData.birth_date = birth_date ? parseUserDateOnly(birth_date) : null;
     if (gender !== undefined) updateData.gender = gender || null;
     if (phone !== undefined) updateData.phone = phone || null;
     if (address !== undefined) updateData.address = address || null;
     if (emergency_contact !== undefined) updateData.emergency_contact = emergency_contact || null;
     if (emergency_phone !== undefined) updateData.emergency_phone = emergency_phone || null;
-    if (hire_date !== undefined) updateData.hire_date = hire_date || null;
+    if (hire_date !== undefined) updateData.hire_date = hire_date ? parseUserDateOnly(hire_date) : null;
     if (employment_type !== undefined) updateData.employment_type = employment_type || null;
     if (salary !== undefined) {
       const verified = await verifyCurrentUserPassword(req, (req.body as any).currentPassword);
@@ -1970,7 +2056,7 @@ router.post(
     }
 
     const tenantId = (req as any).user.tenant_id;
-    const companyId = (req as any).user.company_id;
+    let companyId = (req as any).user.company_id;
     const userRole = (req as any).user.role;
 
     // Excel 파일 파싱
@@ -1986,9 +2072,36 @@ router.post(
       });
     }
 
+    // 회사 스코프 확정 (부서 관리와 동일 회사로 등록)
+    if ((companyId == null || !Number.isFinite(Number(companyId))) && userRole === 'root') {
+      const firstCompanyId = data.map((r: any) => r['회사ID']).find((v: any) => v != null && String(v).trim() !== '');
+      if (firstCompanyId != null) companyId = parseInt(String(firstCompanyId), 10);
+    }
+    if (companyId == null || !Number.isFinite(Number(companyId))) {
+      const fallbackCompany = await (Company as any).findOne({
+        where: { tenant_id: tenantId },
+        order: [['id', 'ASC']],
+        attributes: ['id'],
+      });
+      if (fallbackCompany) companyId = Number(fallbackCompany.id);
+    }
+    if (companyId == null || !Number.isFinite(Number(companyId))) {
+      return res.status(400).json({
+        success: false,
+        message: '회사를 확인할 수 없어 부서·사용자를 등록할 수 없습니다.',
+      });
+    }
+    const defaultCompanyId = Number(companyId);
+
+    await ensureDepartmentColumns();
+    await ensurePositionSchema();
+
     const results = {
       success: [] as any[],
       failed: [] as any[],
+      skipped: [] as any[],
+      departments_created: [] as string[],
+      positions_created: [] as string[],
       total: data.length
     };
 
@@ -2006,53 +2119,107 @@ router.post(
       }
     }
 
-    const deptCache = new Map<string, { id: number; name: string } | null>();
-    const posCache = new Map<string, { id: number; name: string } | null>();
+    const deptCache = new Map<string, { id: number; name: string }>();
+    const posCache = new Map<string, { id: number; name: string }>();
+    const seenUserids = new Set<string>();
+    const seenEmails = new Set<string>();
 
     const resolveOrgByName = async (
       kind: 'dept' | 'pos',
       nameRaw: string,
       companyIdForLookup: number | null | undefined
-    ): Promise<{ id: number | null; name: string | null }> => {
+    ): Promise<{ id: number | null; name: string | null; created?: boolean }> => {
       const name = String(nameRaw || '').trim();
       if (!name) return { id: null, name: null };
       if (companyIdForLookup == null || !Number.isFinite(Number(companyIdForLookup))) {
         return { id: null, name };
       }
-      const cacheKey = `${companyIdForLookup}:${name.toLowerCase()}`;
+      const companyIdNum = Number(companyIdForLookup);
+      const cacheKey = `${companyIdNum}:${name.toLowerCase()}`;
       const cache = kind === 'dept' ? deptCache : posCache;
       if (cache.has(cacheKey)) {
-        const hit = cache.get(cacheKey)!;
-        return hit ? { id: hit.id, name: hit.name } : { id: null, name };
+        return cache.get(cacheKey)!;
       }
-      const row =
-        kind === 'dept'
-          ? await Department.findOne({
-              where: {
-                tenant_id: tenantId,
-                company_id: Number(companyIdForLookup),
-                is_active: true,
-                name: { [Op.iLike]: name },
-              },
-            })
-          : await Position.findOne({
-              where: {
-                tenant_id: tenantId,
-                company_id: Number(companyIdForLookup),
-                is_active: true,
-                name: { [Op.iLike]: name },
-              },
-            });
-      if (row) {
-        const mapped = { id: Number(row.id), name: String(row.name) };
-        cache.set(cacheKey, mapped);
-        return mapped;
+
+      const Model = kind === 'dept' ? Department : Position;
+      let row = await Model.findOne({
+        where: {
+          tenant_id: tenantId,
+          company_id: companyIdNum,
+          name: { [Op.iLike]: name },
+        },
+      });
+
+      let created = false;
+      if (row && row.is_active === false) {
+        await row.update({ is_active: true });
       }
-      cache.set(cacheKey, null);
-      return { id: null, name };
+
+      if (!row) {
+        try {
+          row = await Model.create({
+            tenant_id: tenantId,
+            company_id: companyIdNum,
+            name,
+            sort_order: 0,
+            is_active: true,
+          } as any);
+          created = true;
+        } catch (createErr: any) {
+          row = await Model.findOne({
+            where: {
+              tenant_id: tenantId,
+              company_id: companyIdNum,
+              name: { [Op.iLike]: name },
+            },
+          });
+          if (!row) throw createErr;
+          if (row.is_active === false) {
+            await row.update({ is_active: true });
+          }
+        }
+      }
+
+      const mapped = { id: Number(row.id), name: String(row.name) };
+      cache.set(cacheKey, mapped);
+      return { ...mapped, created };
     };
 
-    // 각 행 처리
+    // 1단계: 엑셀 부서·직책을 부서/직책 관리에 먼저 등록
+    const preseedDepts = new Set<string>();
+    const preseedPositions = new Set<string>();
+    for (const row of data as any[]) {
+      const deptName = row['부서'] != null ? String(row['부서']).trim() : '';
+      const posName = row['직책'] != null ? String(row['직책']).trim() : '';
+      let rowCompanyId = defaultCompanyId;
+      if (userRole === 'root' && row['회사ID']) {
+        const parsed = parseInt(String(row['회사ID']), 10);
+        if (Number.isFinite(parsed)) rowCompanyId = parsed;
+      }
+      if (deptName) preseedDepts.add(`${rowCompanyId}::${deptName}`);
+      if (posName) preseedPositions.add(`${rowCompanyId}::${posName}`);
+    }
+
+    for (const key of preseedDepts) {
+      const sep = key.indexOf('::');
+      const cid = Number(key.slice(0, sep));
+      const name = key.slice(sep + 2);
+      const resolved = await resolveOrgByName('dept', name, cid);
+      if (resolved.created && resolved.name) {
+        results.departments_created.push(resolved.name);
+      }
+    }
+    for (const key of preseedPositions) {
+      const sep = key.indexOf('::');
+      const cid = Number(key.slice(0, sep));
+      const name = key.slice(sep + 2);
+      const resolved = await resolveOrgByName('pos', name, cid);
+      if (resolved.created && resolved.name) {
+        results.positions_created.push(resolved.name);
+      }
+    }
+
+    // 2단계: 사용자 등록 (중복은 제외하고 계속)
     for (let i = 0; i < data.length; i++) {
       const row = data[i] as any;
       try {
@@ -2067,25 +2234,52 @@ router.post(
         }
 
         const userid = row['사용자ID'].toString().trim();
-        const email = row['이메일'].toString().trim();
+        const email = row['이메일'].toString().trim().toLowerCase();
 
-        // 중복 사용자ID 확인
-        const existingUser = await (User as any).findOne({
-          where: {
-            userid
-          }
-        });
-
-        if (existingUser) {
+        if (!emailPattern.test(email)) {
           results.failed.push({
             row: i + 2,
             data: row,
-            error: '이미 등록된 사용자ID입니다.'
+            error: '이메일 형식이 올바르지 않습니다.'
           });
           continue;
         }
 
-        // 중복 이메일 확인 (대소문자 무시)
+        // 파일 내 중복 제외
+        if (seenUserids.has(userid.toLowerCase())) {
+          results.skipped.push({
+            row: i + 2,
+            data: row,
+            error: '파일 내 중복 사용자ID로 제외했습니다.'
+          });
+          continue;
+        }
+        if (seenEmails.has(email)) {
+          results.skipped.push({
+            row: i + 2,
+            data: row,
+            error: '파일 내 중복 이메일로 제외했습니다. 이메일은 중복될 수 없습니다.'
+          });
+          continue;
+        }
+
+        // DB 중복 사용자ID → 제외 후 나머지 계속
+        const existingUser = await (User as any).findOne({
+          where: {
+            userid: { [Op.iLike]: userid }
+          }
+        });
+
+        if (existingUser) {
+          results.skipped.push({
+            row: i + 2,
+            data: row,
+            error: '이미 등록된 사용자ID로 제외했습니다.'
+          });
+          continue;
+        }
+
+        // DB 중복 이메일 → 제외 (메일 주소는 중복 불가)
         const existingEmail = await (User as any).findOne({
           where: {
             email: { [Op.iLike]: email }
@@ -2093,18 +2287,22 @@ router.post(
         });
 
         if (existingEmail) {
-          results.failed.push({
+          results.skipped.push({
             row: i + 2,
             data: row,
-            error: '이미 등록된 이메일입니다.'
+            error: '이미 등록된 이메일로 제외했습니다. 이메일은 중복될 수 없습니다.'
           });
           continue;
         }
 
+        seenUserids.add(userid.toLowerCase());
+        seenEmails.add(email);
+
         // 회사 ID 결정 (root는 company_id를 선택할 수 있음)
-        let finalCompanyId = companyId;
+        let finalCompanyId = defaultCompanyId;
         if (userRole === 'root' && row['회사ID']) {
-          finalCompanyId = parseInt(row['회사ID'].toString());
+          const parsed = parseInt(row['회사ID'].toString(), 10);
+          if (Number.isFinite(parsed)) finalCompanyId = parsed;
         }
 
         // 사원번호 자동 생성 (없는 경우)
@@ -2175,7 +2373,7 @@ router.post(
           tenant_id: tenantId,
           company_id: finalCompanyId,
           userid,
-          username: row['이름'].toString().trim(),
+          username: normalizePersonName(row['이름']),
           email,
           password_hash: passwordHash,
           role: importRole,
@@ -2184,7 +2382,7 @@ router.post(
           position_id: posResolved.id,
           position: posResolved.name,
           employee_number: employeeNumber || null,
-          birth_date: row['생년월일 (YYYY-MM-DD)'] ? new Date(row['생년월일 (YYYY-MM-DD)'].toString()) : null,
+          birth_date: parseUserDateOnly(row['생년월일 (YYYY-MM-DD)']),
           gender: (row['성별 (male/female/other)'] && ['male', 'female', 'other'].includes(row['성별 (male/female/other)'].toString().toLowerCase()))
             ? row['성별 (male/female/other)'].toString().toLowerCase()
             : null,
@@ -2192,7 +2390,7 @@ router.post(
           address: row['주소'] ? row['주소'].toString().trim() : null,
           emergency_contact: row['비상연락처'] ? row['비상연락처'].toString().trim() : null,
           emergency_phone: row['비상연락처 전화번호'] ? row['비상연락처 전화번호'].toString().trim() : null,
-          hire_date: row['입사일 (YYYY-MM-DD)'] ? new Date(row['입사일 (YYYY-MM-DD)'].toString()) : null,
+          hire_date: parseUserDateOnly(row['입사일 (YYYY-MM-DD)']),
           employment_type: (row['고용형태 (fulltime/contract/parttime/intern/daily)'] && ['fulltime', 'contract', 'parttime', 'intern', 'daily'].includes(row['고용형태 (fulltime/contract/parttime/intern/daily)'].toString().toLowerCase()))
             ? row['고용형태 (fulltime/contract/parttime/intern/daily)'].toString().toLowerCase()
             : null,
@@ -2222,17 +2420,37 @@ router.post(
           username: row['이름']
         });
       } catch (error: any) {
-        results.failed.push({
-          row: i + 2,
-          data: row,
-          error: error.message || '알 수 없는 오류가 발생했습니다.'
-        });
+        const msg = String(error?.message || '');
+        const isUnique =
+          error?.name === 'SequelizeUniqueConstraintError' ||
+          /unique|duplicate|이미/i.test(msg);
+        if (isUnique) {
+          results.skipped.push({
+            row: i + 2,
+            data: row,
+            error: '중복 자료로 제외했습니다. (사용자ID 또는 이메일은 중복될 수 없습니다.)'
+          });
+        } else {
+          results.failed.push({
+            row: i + 2,
+            data: row,
+            error: error.message || '알 수 없는 오류가 발생했습니다.'
+          });
+        }
       }
     }
 
+    const skipCount = results.skipped.length;
+    const deptCreated = results.departments_created.length;
+    const parts = [
+      `총 ${results.total}건 중 ${results.success.length}건 등록`,
+      skipCount > 0 ? `${skipCount}건 중복 제외` : null,
+      deptCreated > 0 ? `부서 ${deptCreated}개 자동 등록` : null,
+      results.positions_created.length > 0 ? `직책 ${results.positions_created.length}개 자동 등록` : null,
+    ].filter(Boolean);
     res.json({
       success: true,
-      message: `총 ${results.total}건 중 ${results.success.length}건이 성공적으로 등록되었습니다.`,
+      message: `${parts.join(', ')}했습니다.`,
       data: results
     });
   } catch (error: any) {

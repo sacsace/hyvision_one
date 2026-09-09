@@ -5,7 +5,7 @@ import { Department, User } from '../models';
 import sequelize from '../config/database';
 
 /** 구 DB에 departments 스키마가 불완전할 때 런타임 보정 (마이그레이션과 동일) */
-async function ensureDepartmentColumns(): Promise<void> {
+export async function ensureDepartmentColumns(): Promise<void> {
   try {
     await sequelize.query(`
       ALTER TABLE "departments"

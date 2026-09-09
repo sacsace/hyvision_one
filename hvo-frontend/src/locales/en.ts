@@ -448,7 +448,7 @@ export default {
       excelExport: 'Export Excel',
       excelImport: 'Bulk register',
       bulkRegisterHint:
-        'Download the sample Excel, fill it in, then upload to register multiple users at once. Required: User ID, Name, Email, Password.',
+        'Download the sample Excel, fill it in, then upload to register multiple users at once. Required: User ID, Name, Email, Password. Missing departments are created automatically; duplicate emails are skipped.',
       search: 'Search by name, email, employee number...',
       company: 'Company',
       allCompanies: 'All',
@@ -617,11 +617,12 @@ export default {
       excelImportError: 'Failed to import Excel file.',
       excelImportTitle: 'Bulk register new users',
       excelImportDesc:
-        'Select an Excel (.xlsx) file matching the sample template. Department and job title names are linked when they match the master list.',
+        'Select an Excel (.xlsx) file matching the sample template. Missing departments/job titles are created automatically. Duplicate email or user ID rows are skipped.',
       selectedFile: 'Selected file',
       importResultTitle: 'Import result',
       importSuccessSummary: '{{success}} of {{total}} succeeded',
       importFailedCount: 'Failed: {{count}}',
+      importSkippedCount: 'Skipped duplicates: {{count}}',
       importRowError: 'Row {{row}}: {{error}}',
       importing: 'Registering...',
       importButton: 'Bulk register',
@@ -4705,6 +4706,8 @@ export default {
       brandName: 'Hyvision One',
       brandTagline: 'Integrated ERP for Hyvision India',
       heroCompany: 'HyVISION SYSTEM INDIA PRIVATE LIMITED',
+      heroProductName: 'Hyvision One',
+      heroProductLine: 'System Integration · ERP',
       heroHeadline: "Leading India's Future of Manufacturing",
       heroSubtext:
         'Delivering high precision vision inspection and automation technology optimized for the Indian manufacturing environment.',
