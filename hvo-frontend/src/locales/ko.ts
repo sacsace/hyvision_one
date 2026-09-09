@@ -1,8 +1,8 @@
-export default {
+const ko = {
   translation: {
     seo: {
-      title: 'Hyvision One - Integrated ERP for Hyvision India',
-      description: 'Hyvision One - Integrated ERP for Hyvision India',
+      title: 'Hyvision One - 하이비전 인도 통합 ERP',
+      description: 'Hyvision One - Hyvision India를 위한 통합 ERP·시스템 인티그레이션 플랫폼',
     },
     common: {
       processing: '처리 중...',
@@ -448,7 +448,7 @@ export default {
       excelExport: 'Excel 내보내기',
       excelImport: '일괄 등록',
       bulkRegisterHint:
-        '샘플 엑셀을 내려받아 작성한 뒤 업로드하면 여러 사용자를 한 번에 등록합니다. 필수: 사용자ID, 이름, 이메일, 비밀번호. 부서는 없으면 자동 등록되며, 이메일 중복 행은 제외됩니다.',
+        '샘플 엑셀을 내려받아 작성한 뒤 업로드하면 여러 사용자를 한 번에 등록합니다. 필수: 사용자ID, 이름, 이메일, 비밀번호. 부서는 없으면 자동 등록되며, 삭제(비활성)된 계정은 복구되고 활성 중복만 제외됩니다.',
       search: '사용자명, 이메일, 사원번호 검색...',
       company: '회사',
       allCompanies: '전체',
@@ -617,7 +617,7 @@ export default {
       excelImportError: 'Excel 파일 가져오기 중 오류가 발생했습니다.',
       excelImportTitle: '신규 사용자 일괄 등록',
       excelImportDesc:
-        '샘플 양식과 동일한 엑셀(.xlsx)을 선택하세요. 부서·직책이 없으면 부서/직책 관리에 자동 등록됩니다. 이메일·사용자ID 중복 행은 제외하고 나머지만 등록합니다.',
+        '샘플 양식과 동일한 엑셀(.xlsx)을 선택하세요. 부서·직책이 없으면 부서/직책 관리에 자동 등록됩니다. 삭제(비활성)된 사용자는 복구되고, 활성 이메일·사용자ID 중복만 제외합니다.',
       selectedFile: '선택된 파일',
       importResultTitle: '등록 결과',
       importSuccessSummary: '총 {{total}}건 중 {{success}}건 성공',
@@ -1164,7 +1164,7 @@ export default {
     },
       menuPermissionManagement: {
       title: '메뉴 권한 관리',
-      description: 'Root 권한으로 회사별, 사용자별 메뉴 접근 권한을 관리하는 페이지입니다.',
+      description: 'Root 권한으로 사용자별 메뉴 접근 권한을 관리하는 페이지입니다.',
       select: '선택',
       userSearch: '사용자 검색',
       userSearchPlaceholder: '사용자명, 역할 검색...',
@@ -1189,8 +1189,8 @@ export default {
       permissionDelegation: '권한 위임',
       loading: '로딩 중...',
       noMenus: '메뉴가 없습니다.',
-      selectUserOrCompany: '사용자 또는 회사를 선택해주세요.',
-      emptyPanelHint: '왼쪽 목록에서 대상을 선택하면 메뉴별 권한을 편집할 수 있습니다.',
+      selectUserOrCompany: '사용자를 선택해주세요.',
+      emptyPanelHint: '왼쪽 목록에서 사용자를 선택하면 메뉴별 권한을 편집할 수 있습니다.',
       permissionsSaved: '권한이 저장되었습니다.',
       permissionsSaveFailed: '권한 저장에 실패했습니다.',
       companyPermissionsSaved: '{{count}}명의 사용자 권한이 저장되었습니다.',
@@ -1635,6 +1635,11 @@ export default {
         companyName: '회사명',
         companyContact: '회사 연락처',
         downloadPdf: 'PDF 다운로드',
+        downloadAllTitle: '모든 직원 명세서 받기',
+        downloadAllProgress: '명세서 생성 중 {{current}}/{{total}}…',
+        downloadAllDone: '전 직원 명세서 ZIP을 받았습니다. ({{count}}건)',
+        downloadAllFailed: '명세서 ZIP 다운로드에 실패했습니다.',
+        downloadAllNoRows: '다운로드할 급여 행이 없습니다. 급여월을 확인하세요.',
         sendTitle: '급여 명세서 보내기',
         sendRequiresComplete:
           '선택한 급여월에 대해「급여 생성 완료」를 먼저 진행한 뒤 발송할 수 있습니다. (급여 생성 대화상자의 급여월 기준)',
@@ -5025,6 +5030,9 @@ export default {
       noLeaveBalances: '표시할 직원 휴가 잔여일이 없습니다.',
       leaveBalancesHint: '인도 회계연도(4/1~다음 해 3/31)와 입사일·연차 사용 가능일을 함께 반영합니다. 해당 연도에 실제 근무·부여 대상인 개월 수(1개월=1일)가 총 연차이며, 휴가 연도 열에는 직원별 부여 기간이 표시됩니다. 입사월은 제외(회계연도 4/1 입사만 해당 월 포함), 31일 입사는 한 달 더 제외, 연차 대기일이 월 중간이면 그 달도 제외합니다.',
       leaveBalancesSearchPlaceholder: '직원명, 부서, 직책, 입사일 검색...',
+      leaveHistoryTitle: '휴가 사용 기록',
+      leaveHistoryEmpty: '이 직원의 휴가 신청 기록이 없습니다.',
+      leaveHistoryHint: '직원명을 클릭하면 과거 휴가 기록을 볼 수 있습니다.',
       sickOptional: '비의무',
       sickOptionalHint: '병가는 의무 휴가가 아닙니다.',
       optionalLeave: '비의무',
@@ -5498,3 +5506,4 @@ export default {
   }
 };
 
+export default ko;

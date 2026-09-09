@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import PayslipContent, { type PayslipCompanyInfo, type PayslipHeaderLayout } from './PayslipContent';
+import PayslipContent, { type PayslipCompanyInfo, type PayslipHeaderLayout, toPayslipCompanyInfo } from './PayslipContent';
 import type { PayrollGridRow } from './payroll/payrollGridTypes';
 import { buildPayslipLabels, buildPayslipPdfFilename, downloadPayslipPdf, generatePayslipPdfBlob } from './payrollPayslipPdf';
 import { useReferenceDataStore } from '../../store/referenceDataStore';
@@ -39,12 +39,7 @@ const PayrollPayslipDialog: React.FC<Props> = ({
       try {
         const company = await useReferenceDataStore.getState().fetchCompanyById(Number(user.company_id));
         if (!mounted) return;
-        setCompanyInfo({
-          name: company?.name || '',
-          address: company?.address || '',
-          phone: company?.phone || company?.phone_number || '',
-          email: company?.email || ''
-        });
+        setCompanyInfo(toPayslipCompanyInfo(company));
       } catch {
         if (mounted) setCompanyInfo(null);
       }

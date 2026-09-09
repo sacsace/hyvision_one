@@ -18,6 +18,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import HvoPageHeader from '../../components/Common/HvoPageHeader';
+import PayMonthField from '../../components/Common/PayMonthField';
 import {
   hvoPageRootFullBleedSx,
   hvoKpiCardSx,
@@ -39,18 +40,22 @@ import {
   TaskAlt as TaskAltIcon,
   FileDownload as FileDownloadIcon,
   FileUpload as FileUploadIcon,
+  FolderZip as FolderZipIcon,
 } from '@mui/icons-material';
 import { payrollService, companyService } from '../../services/api';
 import { useStore } from '../../store';
+import { useReferenceDataStore } from '../../store/referenceDataStore';
 import PayrollExcelGrid, { payrollRecordToGridRow, type PayrollGridRow } from './PayrollExcelGrid';
 import PayrollPayslipDialog from './PayrollPayslipDialog';
 import PayrollSendPayslipsDialog from './PayrollSendPayslipsDialog';
 import PayrollExcelImportDialog from './PayrollExcelImportDialog';
 import type { PayslipHeaderLayout } from './PayslipContent';
+import { toPayslipCompanyInfo } from './PayslipContent';
+import { downloadAllPayslipsAsZip } from './payrollPayslipPdf';
 import { exportPayrollGridToExcel } from './payroll/exportPayrollGridToExcel';
 import { resolveRegisteredStateCodeFromCompanyLike } from './payroll/indianProfessionalTax';
 import { useMenuRoutePermissionFlags } from '../../hooks/useMenuRoutePermissionFlags';
-import { normalizePayMonth, isPayMonthAfterCurrent } from '../../utils/payMonth';
+import { normalizePayMonth, isPayMonthAfterCurrent, formatPayMonthLabel } from '../../utils/payMonth';
 
 const PAYROLL_MENU_ROUTES = ['/hr/payroll', '/hr'] as const;
 const PAYSLIP_SEND_MENU_ROUTES = ['/hr/payslip-send', '/hr'] as const;
@@ -64,24 +69,6 @@ function parsePayrollMoney(v: unknown): number {
 
 function formatPayrollSummaryRupee(amount: number): string {
   return Math.floor(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-}
-
-/** 필드 테두리·라벨 영역 클릭 시에도 네이티브 월 선택기가 열리도록 */
-function openMonthPickerFromFieldContainer(e: React.MouseEvent<HTMLElement>) {
-  if ((e.target as HTMLElement).closest('input[type="month"]')) return;
-  const input = e.currentTarget.querySelector('input[type="month"]') as HTMLInputElement | null;
-  if (!input || input.disabled) return;
-  try {
-    if (typeof input.showPicker === 'function') {
-      input.showPicker();
-    } else {
-      input.focus();
-      input.click();
-    }
-  } catch {
-    input.focus();
-    input.click();
-  }
 }
 
 type PayrollBulkPreviewAttendance = {
@@ -107,7 +94,7 @@ type PayrollManagementProps = {
 };
 
 const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly = false }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const user = useStore((s) => s.user);
   const isRoot = useStore((s) => s.user?.role === 'root');
   const menuFlags = useMenuRoutePermissionFlags(
@@ -138,6 +125,7 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
   const [sendAfterCompleteOpen, setSendAfterCompleteOpen] = useState(false);
   const [sendAutomatically, setSendAutomatically] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [downloadingAllPayslips, setDownloadingAllPayslips] = useState(false);
   const [payrollPreviewOpen, setPayrollPreviewOpen] = useState(false);
   const [payrollPreviewPayload, setPayrollPreviewPayload] = useState<PayrollBulkPreviewPayload | null>(null);
   const [previewAttendanceLoading, setPreviewAttendanceLoading] = useState(false);
@@ -240,6 +228,7 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
 
   const periodTrim = payrollPeriod.trim();
   const periodKey = normalizePayMonth(periodTrim);
+  const payMonthLabel = formatPayMonthLabel(periodKey || periodTrim, i18n.language);
   const isFuturePayMonth = !!periodKey && isPayMonthAfterCurrent(periodKey);
   const maxSelectablePayMonth = (() => {
     const d = new Date();
@@ -453,6 +442,58 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
     })();
   }, [gridRows, menuFlags.canRead, menuFlags.menusLoading, t, user?.company_id]);
 
+  const handleDownloadAllPayslips = useCallback(() => {
+    if (menuFlags.menusLoading || !menuFlags.canRead || !gridRows.length || downloadingAllPayslips) {
+      return;
+    }
+    void (async () => {
+      setDownloadingAllPayslips(true);
+      setError('');
+      try {
+        let companyInfo = null;
+        if (user?.company_id) {
+          try {
+            const company = await useReferenceDataStore
+              .getState()
+              .fetchCompanyById(Number(user.company_id));
+            companyInfo = toPayslipCompanyInfo(company);
+          } catch {
+            companyInfo = null;
+          }
+        }
+        const { count } = await downloadAllPayslipsAsZip(gridRows, companyInfo, {
+          headerLayout: payslipHeaderLayout,
+          companyId: user?.company_id ?? null,
+          periodLabel: periodKey || payrollPeriod.trim(),
+          onProgress: (current, total) => {
+            setSuccess(
+              t('payrollManagement.payslip.downloadAllProgress', { current, total })
+            );
+          },
+        });
+        setSuccess(t('payrollManagement.payslip.downloadAllDone', { count }));
+      } catch (err: any) {
+        if (err?.message === 'NO_ROWS') {
+          setError(t('payrollManagement.payslip.downloadAllNoRows'));
+        } else {
+          setError(t('payrollManagement.payslip.downloadAllFailed'));
+        }
+      } finally {
+        setDownloadingAllPayslips(false);
+      }
+    })();
+  }, [
+    downloadingAllPayslips,
+    gridRows,
+    menuFlags.canRead,
+    menuFlags.menusLoading,
+    payslipHeaderLayout,
+    periodKey,
+    payrollPeriod,
+    t,
+    user?.company_id,
+  ]);
+
   /** 급여 생성 완료(잠금)된 월 — 명세서 발송 허용·「급여 생성 완료」재실행 비활성 */
   const selectedPeriodPayrollComplete = !!periodKey && lockedPeriods.has(periodKey);
   /** 확정된 월만 상단·대화상자에서 일괄 생성 차단(미생성 월은 미리보기 후 생성) */
@@ -627,7 +668,7 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
       ) : (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
           {periodKey
-            ? t('payrollManagement.summary.scopeForPayMonth', { period: periodKey })
+            ? t('payrollManagement.summary.scopeForPayMonth', { period: payMonthLabel })
             : t('payrollManagement.summary.scopeNoMonth')}
         </Typography>
       )}
@@ -700,6 +741,32 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
                 </span>
               </Tooltip>
             )}
+            <Tooltip title={t('common.menuNoView')} disableHoverListener={menuFlags.menusLoading || menuFlags.canRead}>
+              <span style={{ display: 'inline-flex' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={
+                    downloadingAllPayslips ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <FolderZipIcon fontSize="small" />
+                    )
+                  }
+                  onClick={handleDownloadAllPayslips}
+                  disabled={
+                    menuFlags.menusLoading ||
+                    !menuFlags.canRead ||
+                    loading ||
+                    downloadingAllPayslips ||
+                    gridRows.length === 0
+                  }
+                  sx={hvoBodyOutlinedBtnSx}
+                >
+                  {t('payrollManagement.payslip.downloadAllTitle')}
+                </Button>
+              </span>
+            </Tooltip>
             {!payslipSendOnly && (
               <Tooltip title={excelUploadTooltip} disableHoverListener={!excelUploadTooltip}>
                 <span style={{ display: 'inline-flex' }}>
@@ -747,32 +814,6 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
               <MenuItem value="compact">간단형</MenuItem>
               <MenuItem value="companyFirst">회사 우선형</MenuItem>
             </TextField>
-            {!payslipSendOnly && (
-              <Tooltip title={completePayrollToolbarTooltip} disableHoverListener={!completePayrollToolbarTooltip}>
-                <span style={{ display: 'inline-flex' }}>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    disableElevation
-                    size="small"
-                    startIcon={<TaskAltIcon fontSize="small" />}
-                    onClick={() => setCompleteDialogOpen(true)}
-                    disabled={completePayrollToolbarDisabled}
-                    sx={{
-                      textTransform: 'none',
-                      borderRadius: '10px',
-                      fontWeight: 600,
-                      fontSize: '0.8125rem',
-                      minHeight: 36,
-                      px: 2,
-                      boxShadow: 'none',
-                    }}
-                  >
-                    {t('payrollManagement.actions.completePayroll')}
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
           </Box>
           {!payslipSendOnly && (
             <Box
@@ -822,18 +863,16 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
             alignItems: 'flex-end',
           }}
         >
-          <TextField
+          <PayMonthField
             fullWidth
             size="small"
-            type="month"
             label={t('payrollManagement.searchPayMonthLabel')}
             {...PAYROLL_FILTER_OUTLINED}
             value={payrollPeriod}
-            onChange={(e) => setPayrollPeriod(e.target.value)}
-            onClick={openMonthPickerFromFieldContainer}
-            inputProps={{ max: maxSelectablePayMonth }}
+            onChange={setPayrollPeriod}
+            max={maxSelectablePayMonth}
             disabled={menuFlags.menusLoading || !menuFlags.canRead}
-            sx={{ ...payrollFilterFieldSx, cursor: menuFlags.menusLoading || !menuFlags.canRead ? undefined : 'pointer' }}
+            sx={payrollFilterFieldSx}
           />
           <TextField
             fullWidth
@@ -956,7 +995,7 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
             >
               <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
                 {periodKey
-                  ? t('payrollManagement.listSummary', { period: periodKey, count: gridRows.length })
+                  ? t('payrollManagement.listSummary', { period: payMonthLabel, count: gridRows.length })
                   : t('payrollManagement.listSummaryNoMonth', { count: gridRows.length })}
               </Typography>
               <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>
@@ -979,6 +1018,41 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
                 companyId={user?.company_id}
                 companyStateCode={companyRegisteredStateCode}
                 payrollMonth={payrollRecalcContext.payrollMonth}
+                toolbarExtra={
+                  !payslipSendOnly ? (
+                    <Tooltip title={completePayrollToolbarTooltip} disableHoverListener={!completePayrollToolbarTooltip}>
+                      <span style={{ display: 'inline-flex' }}>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          disableElevation
+                          size="small"
+                          startIcon={<TaskAltIcon fontSize="small" />}
+                          onClick={() => setCompleteDialogOpen(true)}
+                          disabled={completePayrollToolbarDisabled}
+                          sx={{
+                            textTransform: 'none',
+                            borderRadius: '10px',
+                            fontWeight: 700,
+                            fontSize: '0.8125rem',
+                            minHeight: 36,
+                            px: 2,
+                            boxShadow: 'none',
+                            bgcolor: 'error.main',
+                            color: '#fff',
+                            '&:hover': { bgcolor: 'error.dark' },
+                            '&.Mui-disabled': {
+                              bgcolor: 'error.light',
+                              color: 'rgba(255,255,255,0.7)',
+                            },
+                          }}
+                        >
+                          {t('payrollManagement.actions.completePayroll')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  ) : null
+                }
               />
             </Box>
           </Box>
@@ -1026,17 +1100,14 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {t('payrollManagement.dialog.enterInfo')}
             </Typography>
-            <TextField
+            <PayMonthField
               fullWidth
-              type="month"
               label={t('payrollManagement.dialog.payrollPeriodLabel')}
               value={payrollPeriod}
-              onChange={(e) => setPayrollPeriod(e.target.value)}
-              onClick={openMonthPickerFromFieldContainer}
+              onChange={setPayrollPeriod}
               InputLabelProps={{ shrink: true }}
-              inputProps={{ max: maxSelectablePayMonth }}
+              max={maxSelectablePayMonth}
               disabled={menuFlags.menusLoading || !menuFlags.canCreate}
-              sx={{ cursor: menuFlags.menusLoading || !menuFlags.canCreate ? undefined : 'pointer' }}
             />
           </Box>
         </DialogContent>
@@ -1154,19 +1225,14 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
         <DialogTitle>{t('payrollManagement.dialog.completeTitle')}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1 }}>
-            <TextField
+            <PayMonthField
               fullWidth
-              type="month"
               label={t('payrollManagement.dialog.payrollPeriodLabel')}
               value={payrollPeriod}
-              onChange={(e) => setPayrollPeriod(e.target.value)}
-              onClick={openMonthPickerFromFieldContainer}
+              onChange={setPayrollPeriod}
               InputLabelProps={{ shrink: true }}
-              inputProps={{ max: maxSelectablePayMonth }}
-              sx={{
-                mb: 2,
-                cursor: menuFlags.menusLoading || !menuFlags.canMutate ? undefined : 'pointer'
-              }}
+              max={maxSelectablePayMonth}
+              sx={{ mb: 2 }}
               disabled={menuFlags.menusLoading || !menuFlags.canMutate}
             />
             <Alert severity="warning" sx={{ mb: 1.5 }}>
@@ -1174,7 +1240,7 @@ const PayrollManagement: React.FC<PayrollManagementProps> = ({ payslipSendOnly =
             </Alert>
             <Typography variant="body2" color="text.secondary">
               {t('payrollManagement.dialog.completeMessage', {
-                period: payrollPeriod.trim() || '—'
+                period: payMonthLabel || '—'
               })}
             </Typography>
           </Box>

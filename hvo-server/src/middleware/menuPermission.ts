@@ -17,7 +17,7 @@ export const requireMenuPermission = (menuRoute: string, flag: MenuPermissionFla
         res.status(401).json({ success: false, message: '인증이 필요합니다.' });
         return;
       }
-      if (user.role === 'root') {
+      if (user.role === 'root' || user.role === 'admin') {
         next();
         return;
       }
@@ -69,7 +69,7 @@ export const requireMenuPermissionAny = (menuRoutes: string[], flag: MenuPermiss
         res.status(401).json({ success: false, message: '인증이 필요합니다.' });
         return;
       }
-      if (user.role === 'root') {
+      if (user.role === 'root' || user.role === 'admin') {
         next();
         return;
       }

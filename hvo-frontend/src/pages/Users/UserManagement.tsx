@@ -415,12 +415,6 @@ const highlightPayrollFieldsSx = {
   boxSizing: 'border-box' as const,
 };
 
-/** 부서·직책 행 */
-const highlightDeptPositionRowSx = {
-  width: '100%',
-  boxSizing: 'border-box' as const,
-};
-
 /** 폼 outlined 라벨 — 테두리 위 고정 */
 const OUTLINED_FIELD = hvoOutlinedLabelProps;
 
@@ -619,7 +613,6 @@ const UserManagement: React.FC = () => {
     return '';
   });
   const rootCompanyDefaultApplied = useRef(selectedCompanyId !== '');
-  const [showInactive, setShowInactive] = useState(false); // 비활성 사용자 표시 여부
   const [orderBy, setOrderBy] = useState<string>('');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -1559,14 +1552,13 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // 필터링된 사용자 목록 계산
+  // 필터링된 사용자 목록 계산 (비활성 사용자 제외)
   const filteredUsers = React.useMemo(() => {
     const filtered = users.filter(user => {
-      // 기본적으로 inactive 사용자는 숨김
-      if (!showInactive && user.status === 'inactive') {
+      if (user.status === 'inactive') {
         return false;
       }
-      
+
       // 검색어 필터링
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
@@ -1578,7 +1570,7 @@ const UserManagement: React.FC = () => {
           (user.position && user.position.toLowerCase().includes(searchLower))
         );
       }
-      
+
       return true;
     });
 
@@ -1587,29 +1579,28 @@ const UserManagement: React.FC = () => {
       return [...filtered].sort((a, b) => {
         let aValue: any = a[orderBy as keyof User];
         let bValue: any = b[orderBy as keyof User];
-        
+
         if (typeof aValue === 'string') {
           aValue = aValue.toLowerCase();
           bValue = (bValue || '').toLowerCase();
         }
-        
+
         if (aValue < bValue) return order === 'asc' ? -1 : 1;
         if (aValue > bValue) return order === 'asc' ? 1 : -1;
         return 0;
       });
     }
-    
-    return filtered;
-  }, [users, searchTerm, showInactive, orderBy, order]);
 
-  const userStats = useMemo(
-    () => ({
-      total: users.length,
-      active: users.filter((u) => u.status === 'active').length,
-      inactive: users.filter((u) => u.status === 'inactive').length,
-    }),
-    [users]
-  );
+    return filtered;
+  }, [users, searchTerm, orderBy, order]);
+
+  const userStats = useMemo(() => {
+    const visible = users.filter((u) => u.status !== 'inactive');
+    return {
+      total: visible.length,
+      active: visible.filter((u) => u.status === 'active').length,
+    };
+  }, [users]);
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
 
@@ -1632,7 +1623,7 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     setPage(1);
     setSelectedUsers([]);
-  }, [searchTerm, selectedCompanyId, showInactive]);
+  }, [searchTerm, selectedCompanyId]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -1645,7 +1636,6 @@ const UserManagement: React.FC = () => {
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-      showInactive ||
       (user?.role === 'root'
         ? selectedCompanyId !== rootDefaultCompanyId
         : Boolean(selectedCompanyId))
@@ -1654,7 +1644,6 @@ const UserManagement: React.FC = () => {
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedCompanyId(rootDefaultCompanyId === '' ? '' : rootDefaultCompanyId);
-    setShowInactive(false);
   };
 
   const closeToolbarMenu = () => setToolbarMenuAnchor(null);
@@ -1798,7 +1787,7 @@ const UserManagement: React.FC = () => {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
               gap: 2.5,
               mb: 3,
             }}
@@ -1806,7 +1795,6 @@ const UserManagement: React.FC = () => {
             {[
               { key: 'total', label: t('userManagement.stats.totalUsers'), value: userStats.total },
               { key: 'active', label: t('userManagement.stats.activeUsers'), value: userStats.active },
-              { key: 'inactive', label: t('userManagement.stats.inactiveUsers'), value: userStats.inactive },
             ].map((item) => (
               <Card key={item.key} elevation={0} sx={hvoKpiCardSx}>
                 <CardContent sx={{ py: 2.25, px: 2.5, '&:last-child': { pb: 2.25 } }}>
@@ -2038,18 +2026,6 @@ const UserManagement: React.FC = () => {
                   textFieldSx={userFilterFieldSx}
                 />
               )}
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={showInactive}
-                    onChange={(e) => setShowInactive(e.target.checked)}
-                    size="small"
-                    disabled={menusLoading || !(hrElevated || userMgmtMenuFlags.canView)}
-                  />
-                }
-                label={t('userManagement.includeInactive')}
-                sx={{ m: 0, alignSelf: 'center', whiteSpace: 'nowrap' }}
-              />
               <Button
                 variant="outlined"
                 size="small"

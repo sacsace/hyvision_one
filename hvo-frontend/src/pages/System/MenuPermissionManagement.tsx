@@ -33,7 +33,6 @@ import HvoPageHeader from '../../components/Common/HvoPageHeader';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
   Security as SecurityIcon,
-  Business as BusinessIcon,
   ExpandMore as ExpandMoreIcon,
   Save as SaveIcon,
   PersonAdd as PersonAddIcon,
@@ -55,15 +54,8 @@ interface User {
   name: string;
   email: string;
   role: string;
-  company: string;
   company_id?: number;
   status?: string;
-}
-
-interface Company {
-  id: number;
-  name: string;
-  domain: string;
 }
 
 interface MenuPermission {
@@ -503,9 +495,7 @@ const MenuPermissionManagement: React.FC = () => {
   const { user } = useStore();
   const { menus, language, userPermissions, hasMenuPermission } = useMenuStore();
   const [userSearchTerm, setUserSearchTerm] = useState('');
-  const [companySearchTerm, setCompanySearchTerm] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   const [expandedMenus, setExpandedMenus] = useState<Set<number>>(new Set());
   const [permissions, setPermissions] = useState<{ [key: string]: MenuPermission }>({});
   const [adminPermissions, setAdminPermissions] = useState<{ [key: string]: MenuPermission }>({});
@@ -534,20 +524,7 @@ const MenuPermissionManagement: React.FC = () => {
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(getDefaultLeftPanelWidth());
   const [isResizing, setIsResizing] = useState(false);
 
-  // 사용자/회사 영역 비율 (위 6: 아래 4)
-  const getDefaultUserSectionHeight = () => {
-    if (typeof window !== 'undefined') {
-      const cardHeight = window.innerHeight - 300; // 대략적인 카드 높이
-      return cardHeight * 0.6; // 60%
-    }
-    return 400;
-  };
-  
-  const [userSectionHeight, setUserSectionHeight] = useState<number>(getDefaultUserSectionHeight());
-  const [isVerticalResizing, setIsVerticalResizing] = useState(false);
-
   const [users, setUsers] = useState<User[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   // 권한 확인 (root 또는 메뉴 권한이 있는 admin)
@@ -598,10 +575,6 @@ const MenuPermissionManagement: React.FC = () => {
   const startXRef = useRef<number>(0);
   const startWidthRef = useRef<number>(0);
 
-  // 리사이즈 핸들러 (상하)
-  const startYRef = useRef<number>(0);
-  const startHeightRef = useRef<number>(0);
-
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -622,28 +595,6 @@ const MenuPermissionManagement: React.FC = () => {
 
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
-  }, []);
-
-  // 수직 리사이즈 핸들러
-  const handleVerticalMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsVerticalResizing(true);
-    startYRef.current = e.clientY;
-    startHeightRef.current = userSectionHeight;
-  }, [userSectionHeight]);
-
-  const handleVerticalMouseMove = useCallback((e: MouseEvent) => {
-    if (!isVerticalResizing) return;
-    
-    const diff = e.clientY - startYRef.current;
-    const minHeight = 150; // 최소 높이
-    const maxHeight = typeof window !== 'undefined' ? (window.innerHeight - 400) : 600; // 최대 높이
-    const newHeight = Math.max(minHeight, Math.min(maxHeight, startHeightRef.current + diff));
-    setUserSectionHeight(newHeight);
-  }, [isVerticalResizing]);
-
-  const handleVerticalMouseUp = useCallback(() => {
-    setIsVerticalResizing(false);
   }, []);
 
   useEffect(() => {
@@ -667,39 +618,7 @@ const MenuPermissionManagement: React.FC = () => {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  useEffect(() => {
-    if (isVerticalResizing) {
-      document.addEventListener('mousemove', handleVerticalMouseMove);
-      document.addEventListener('mouseup', handleVerticalMouseUp);
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-    } else {
-      document.removeEventListener('mousemove', handleVerticalMouseMove);
-      document.removeEventListener('mouseup', handleVerticalMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleVerticalMouseMove);
-      document.removeEventListener('mouseup', handleVerticalMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isVerticalResizing, handleVerticalMouseMove, handleVerticalMouseUp]);
-
-  // 화면 크기 변경 시 4:6 비율 유지 (선택적)
-  useEffect(() => {
-    const handleResize = () => {
-      // 사용자가 수동으로 조정한 경우는 유지
-      // 초기 로드 시에만 비율 적용
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // 사용자 및 회사 목록 로드
+  // 사용자 목록 로드
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
@@ -717,68 +636,34 @@ const MenuPermissionManagement: React.FC = () => {
         setDataLoading(true);
         const currentUserCompanyId = user.company_id;
         
-        // 사용자 목록 로드
         const usersArray = await useReferenceDataStore.getState().fetchUsers();
         
-        let usersData: User[] = [];
-        if (usersArray.length >= 0) {
-          usersData = usersArray
-            .filter((u: any) => u.status === 'active') // 비활성 사용자 제외
-            .filter((u: any) => {
-              // root를 제외한 사용자는 본인 회사 사용자만 표시
-              if (isRoot) return true;
-              return Number(u.company_id) === Number(currentUserCompanyId);
-            })
-            .map((u: any) => ({
-              id: u.id,
-              name: u.username,
-              email: u.email,
-              role: u.role,
-              company: '',
-              company_id: u.company_id,
-              status: u.status
-            }));
-        }
-        
-        // 회사 목록 로드
-        try {
-          const companiesData = await useReferenceDataStore.getState().fetchCompanies();
-
-          if (companiesData.length >= 0) {
-            const scopedCompanies = isRoot
-              ? companiesData
-              : companiesData.filter((c: any) => Number(c.id) === Number(currentUserCompanyId));
-
-            const formattedCompanies = scopedCompanies.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              domain: c.website || c.email || ''
-            }));
-            setCompanies(formattedCompanies);
-            
-            // 사용자 데이터에 회사명 추가
-            usersData = usersData.map(u => {
-              const company = scopedCompanies.find((c: any) => c.id === u.company_id);
-              return {
-                ...u,
-                company: company ? company.name : ''
-              };
-            });
-          }
-        } catch (companyError: any) {
-        }
+        const usersData: User[] = usersArray
+          .filter((u: any) => u.status === 'active')
+          .filter((u: any) => {
+            // 단일 회사: admin은 본인 회사 사용자만
+            if (isRoot) return true;
+            return Number(u.company_id) === Number(currentUserCompanyId);
+          })
+          .map((u: any) => ({
+            id: u.id,
+            name: u.username,
+            email: u.email,
+            role: u.role,
+            company_id: u.company_id,
+            status: u.status
+          }));
         
         setUsers(usersData);
       } catch {
         setUsers([]);
-        setCompanies([]);
       } finally {
         setDataLoading(false);
       }
     };
     
     loadData();
-  }, [user, canManagePermissionPage]);
+  }, [user, canManagePermissionPage, isRoot]);
 
   // Admin 권한 로드 (admin이 user에게 권한을 줄 때 자신의 권한 범위 내에서만 가능하도록)
   useEffect(() => {
@@ -927,7 +812,7 @@ const MenuPermissionManagement: React.FC = () => {
     }
   };
 
-  // 사용자/회사 선택 시 권한 로드
+  // 사용자 선택 시 권한 로드
   useEffect(() => {
     const loadPermissions = async () => {
       if (!canManagePermissionPage) return;
@@ -955,15 +840,13 @@ const MenuPermissionManagement: React.FC = () => {
         } finally {
           setLoading(false);
         }
-      } else if (selectedCompanyId) {
-        setPermissions({});
       } else {
         setPermissions({});
       }
     };
     
     loadPermissions();
-  }, [selectedUserId, selectedCompanyId, canManagePermissionPage]);
+  }, [selectedUserId, canManagePermissionPage]);
 
   // 메뉴 트리 렌더링
   const renderMenuTree = (menuList: Menu[], level: number = 0, parentIndex: number = 0, isLast: boolean = false) => {
@@ -1221,25 +1104,13 @@ const MenuPermissionManagement: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!selectedUserId && !selectedCompanyId) return;
+    if (!selectedUserId) return;
 
     try {
       setSaving(true);
-      if (selectedUserId) {
-        const permissionData = buildPermissionPayload(selectedUserId);
-        await menuService.setUserPermissions(selectedUserId, permissionData);
-        showSuccessPopup(t('menuPermissionManagement.permissionsSaved'));
-      } else if (selectedCompanyId) {
-        const companyUsers = users.filter(u => u.company_id === selectedCompanyId);
-        
-        for (const companyUser of companyUsers) {
-          const permissionData = buildPermissionPayload(companyUser.id);
-          await menuService.setUserPermissions(companyUser.id, permissionData);
-        }
-        showSuccessPopup(
-          t('menuPermissionManagement.companyPermissionsSaved', { count: companyUsers.length })
-        );
-      }
+      const permissionData = buildPermissionPayload(selectedUserId);
+      await menuService.setUserPermissions(selectedUserId, permissionData);
+      showSuccessPopup(t('menuPermissionManagement.permissionsSaved'));
     } catch (error: any) {
       showErrorPopup(error, t('menuPermissionManagement.permissionsSaveFailed'));
     } finally {
@@ -1269,7 +1140,7 @@ const MenuPermissionManagement: React.FC = () => {
     template: 'my_workspace' | 'view_only' | 'read_write' | 'full'
   ) => {
     if (!menuList || menuList.length === 0) return;
-    if (!selectedUserId && !selectedCompanyId) return;
+    if (!selectedUserId) return;
 
     const newPermissions: { [key: string]: MenuPermission } = {};
     const onlyMyWorkspace = template === 'my_workspace';
@@ -1346,30 +1217,13 @@ const MenuPermissionManagement: React.FC = () => {
     // 서버에 저장
     try {
       setSaving(true);
-      if (selectedUserId) {
-        const permissionData = Object.keys(newPermissions).map(menuId => ({
-          user_id: selectedUserId,
-          menu_id: parseInt(menuId),
-          ...newPermissions[menuId]
-        }));
-        await menuService.setUserPermissions(selectedUserId, permissionData);
-        showSuccessPopup(t('menuPermissionManagement.defaultPermissionsApplied'));
-      } else if (selectedCompanyId) {
-        const companyUsers = users.filter(u => u.company_id === selectedCompanyId);
-        for (const companyUser of companyUsers) {
-          const permissionData = Object.keys(newPermissions).map(menuId => ({
-            user_id: companyUser.id,
-            menu_id: parseInt(menuId),
-            ...newPermissions[menuId]
-          }));
-          await menuService.setUserPermissions(companyUser.id, permissionData);
-        }
-        showSuccessPopup(
-          t('menuPermissionManagement.defaultPermissionsAppliedToCompany', {
-            count: companyUsers.length,
-          })
-        );
-      }
+      const permissionData = Object.keys(newPermissions).map(menuId => ({
+        user_id: selectedUserId,
+        menu_id: parseInt(menuId),
+        ...newPermissions[menuId]
+      }));
+      await menuService.setUserPermissions(selectedUserId, permissionData);
+      showSuccessPopup(t('menuPermissionManagement.defaultPermissionsApplied'));
     } catch (error: any) {
       showErrorPopup(error, t('menuPermissionManagement.defaultPermissionsApplyFailed'));
     } finally {
@@ -1469,21 +1323,11 @@ const MenuPermissionManagement: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u => {
-    const matchesUserSearch = !userSearchTerm || 
+    if (!userSearchTerm) return true;
+    return (
       u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      u.role.toLowerCase().includes(userSearchTerm.toLowerCase());
-    const matchesCompanySearch = !companySearchTerm ||
-      u.company.toLowerCase().includes(companySearchTerm.toLowerCase());
-    // 회사가 선택된 경우 해당 회사의 사용자만 표시
-    const matchesSelectedCompany = !selectedCompanyId || u.company_id === selectedCompanyId;
-    return matchesUserSearch && matchesCompanySearch && matchesSelectedCompany;
-  });
-
-  const filteredCompanies = companies.filter(c => {
-    const matchesCompanySearch = !companySearchTerm ||
-      c.name.toLowerCase().includes(companySearchTerm.toLowerCase()) ||
-      c.domain.toLowerCase().includes(companySearchTerm.toLowerCase());
-    return matchesCompanySearch;
+      u.role.toLowerCase().includes(userSearchTerm.toLowerCase())
+    );
   });
 
   const cardShellSx = {
@@ -1549,40 +1393,36 @@ const MenuPermissionManagement: React.FC = () => {
         title={t('menuPermissionManagement.title')}
         description={t('menuPermissionManagement.description')}
         actions={
-          (selectedUserId || selectedCompanyId) ? (
+          selectedUserId ? (
             <>
-              {selectedUserId && (
-                <>
-                  <Button
-                    variant="outlined"
-                    startIcon={<AutoAwesomeIcon />}
-                    onClick={() => setDefaultPermissionDialogOpen(true)}
-                    size="small"
-                    sx={{
-                      borderRadius: '8px',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      px: 2,
-                      borderColor: alpha(theme.palette.divider, 0.95) }}
-                  >
-                    {t('menuPermissionManagement.defaultPermissions')}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<PersonAddIcon />}
-                    onClick={() => setDelegationDialogOpen(true)}
-                    size="small"
-                    sx={{
-                      borderRadius: '8px',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      px: 2,
-                      borderColor: alpha(theme.palette.divider, 0.95) }}
-                  >
-                    {t('menuPermissionManagement.permissionDelegation')}
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="outlined"
+                startIcon={<AutoAwesomeIcon />}
+                onClick={() => setDefaultPermissionDialogOpen(true)}
+                size="small"
+                sx={{
+                  borderRadius: '8px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 2,
+                  borderColor: alpha(theme.palette.divider, 0.95) }}
+              >
+                {t('menuPermissionManagement.defaultPermissions')}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<PersonAddIcon />}
+                onClick={() => setDelegationDialogOpen(true)}
+                size="small"
+                sx={{
+                  borderRadius: '8px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 2,
+                  borderColor: alpha(theme.palette.divider, 0.95) }}
+              >
+                {t('menuPermissionManagement.permissionDelegation')}
+              </Button>
               <Button
                 variant="contained"
                 disableElevation
@@ -1606,7 +1446,7 @@ const MenuPermissionManagement: React.FC = () => {
         gap: 0,
         position: 'relative'
       }}>
-        {/* 왼쪽: 사용자/회사 선택 */}
+        {/* 왼쪽: 사용자 선택 */}
         <Box sx={{ 
           width: `${leftPanelWidth}px`,
           minWidth: '300px',
@@ -1620,7 +1460,6 @@ const MenuPermissionManagement: React.FC = () => {
                 {t('menuPermissionManagement.select')}
               </Typography>
               
-              {/* 사용자 검색 */}
               <Box sx={{ mb: 2 }}>
                 <TextField
                   fullWidth
@@ -1634,24 +1473,9 @@ const MenuPermissionManagement: React.FC = () => {
                 />
               </Box>
 
-              {/* 회사 검색 */}
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label={t('menuPermissionManagement.companySearch')}
-                  placeholder={t('menuPermissionManagement.companySearchPlaceholder')}
-                  value={companySearchTerm}
-                  onChange={(e) => setCompanySearchTerm(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={selectionInputSx}
-                />
-              </Box>
-
-              {/* 사용자 영역 (위 60%) */}
               <Box sx={{ 
-                height: `${userSectionHeight}px`,
-                minHeight: '150px',
+                flex: 1,
+                minHeight: 0,
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden'
@@ -1665,7 +1489,7 @@ const MenuPermissionManagement: React.FC = () => {
                   </Box>
                 ) : filteredUsers.length === 0 ? (
                   <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                    {userSearchTerm || companySearchTerm ? t('common.search') : t('menuPermissionManagement.noUsers')}
+                    {userSearchTerm ? t('common.search') : t('menuPermissionManagement.noUsers')}
                   </Typography>
                 ) : (
                   <List dense sx={{ flex: 1, overflow: 'auto', py: 0.5 }}>
@@ -1673,10 +1497,7 @@ const MenuPermissionManagement: React.FC = () => {
                       <ListItemButton
                         key={u.id}
                         selected={selectedUserId === u.id}
-                        onClick={() => {
-                          setSelectedUserId(u.id);
-                          // 회사 필터는 유지 (사용자 선택 시 회사 필터 해제하지 않음)
-                        }}
+                        onClick={() => setSelectedUserId(u.id)}
                         sx={{
                           mb: 0.5,
                           borderRadius: '8px',
@@ -1715,92 +1536,10 @@ const MenuPermissionManagement: React.FC = () => {
                                   border: 'none',
                                   '& .MuiChip-label': { px: 1 } }}
                               />
-                              <Typography variant="caption" color="text.secondary" sx={{ ml: 0 }}>
-                                {u.company}
-                              </Typography>
                             </Box>
                           }
                           primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 600, letterSpacing: '-0.01em' }}
                           secondaryTypographyProps={{ component: 'div' }}
-                        />
-                      </ListItemButton>
-                    ))}
-                  </List>
-                )}
-              </Box>
-
-              {/* 수직 리사이즈 핸들 */}
-              <Box
-                onMouseDown={handleVerticalMouseDown}
-                sx={{
-                  height: '4px',
-                  cursor: 'row-resize',
-                  backgroundColor: isVerticalResizing ? alpha(theme.palette.primary.main, 0.35) : alpha(theme.palette.divider, 0.9),
-                  borderRadius: '4px',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.2) },
-                  position: 'relative',
-                  flexShrink: 0,
-                  transition: isVerticalResizing ? 'none' : 'background-color 0.2s',
-                  zIndex: 10,
-                  my: 1,
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: '-2px',
-                    bottom: '-2px',
-                    left: 0,
-                    right: 0,
-                    cursor: 'row-resize'
-                  }
-                }}
-              />
-
-              {/* 회사 영역 (아래 40%) */}
-              <Box sx={{ 
-                flex: 1,
-                minHeight: '150px',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}>
-                <Typography component="h3" variant="subtitle2" sx={listSectionTitleSx}>
-                  {t('menuPermissionManagement.companies')}
-                </Typography>
-                {dataLoading ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : filteredCompanies.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-                    {companySearchTerm ? t('common.search') : t('menuPermissionManagement.noCompanies')}
-                  </Typography>
-                ) : (
-                  <List dense sx={{ flex: 1, overflow: 'auto', py: 0.5 }}>
-                    {filteredCompanies.map((c) => (
-                      <ListItemButton
-                        key={c.id}
-                        selected={selectedCompanyId === c.id}
-                        onClick={() => {
-                          setSelectedCompanyId(c.id);
-                          setSelectedUserId(null);
-                        }}
-                        sx={{
-                          mb: 0.5,
-                          borderRadius: '8px',
-                          py: 1,
-                          ...listItemSelectedSx }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                          <BusinessIcon
-                            sx={{
-                              fontSize: '1.25rem',
-                              color: selectedCompanyId === c.id ? 'primary.main' : alpha(theme.palette.text.secondary, 0.85) }}
-                          />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={c.name}
-                          primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }}
                         />
                       </ListItemButton>
                     ))}
@@ -1866,13 +1605,9 @@ const MenuPermissionManagement: React.FC = () => {
                       ? t('menuPermissionManagement.userMenuPermissions', {
                           name: users.find(u => u.id === selectedUserId)?.name ?? '',
                         })
-                      : selectedCompanyId
-                      ? t('menuPermissionManagement.userMenuPermissions', {
-                          name: companies.find(c => c.id === selectedCompanyId)?.name ?? '',
-                        })
                       : t('menuPermissionManagement.selectUserOrCompany')}
                   </Typography>
-                  {(selectedUserId || selectedCompanyId) && (
+                  {selectedUserId && (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, fontSize: '0.8125rem', lineHeight: 1.55 }}>
                       {t('menuPermissionManagement.clickPermissionBoxes')}
                     </Typography>
@@ -1884,7 +1619,7 @@ const MenuPermissionManagement: React.FC = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8, flex: 1 }}>
                   <CircularProgress />
                 </Box>
-              ) : menuList.length > 0 && (selectedUserId || selectedCompanyId) ? (
+              ) : menuList.length > 0 && selectedUserId ? (
                 <Box
                   sx={{
                     flex: 1,
@@ -1993,10 +1728,6 @@ const MenuPermissionManagement: React.FC = () => {
             {selectedUserId
               ? t('menuPermissionManagement.applyDefaultToUser', {
                   name: users.find(u => u.id === selectedUserId)?.name ?? '',
-                })
-              : selectedCompanyId
-              ? t('menuPermissionManagement.applyDefaultToCompany', {
-                  name: companies.find(c => c.id === selectedCompanyId)?.name ?? '',
                 })
               : null}
           </Typography>
@@ -2194,7 +1925,7 @@ const MenuPermissionManagement: React.FC = () => {
               <MenuItem value="">{t('menuPermissionManagement.pleaseSelect')}</MenuItem>
               {users.filter(u => u.id !== selectedUserId && u.status === 'active').map((u) => (
                 <MenuItem key={u.id} value={u.id}>
-                  {u.name} ({u.role}) - {u.company}
+                  {u.name} ({u.role})
                 </MenuItem>
               ))}
             </Select>

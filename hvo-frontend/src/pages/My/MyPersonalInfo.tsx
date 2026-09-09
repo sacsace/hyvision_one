@@ -138,13 +138,6 @@ const formatSalaryInr = (value: unknown): string => {
   return `₹${Math.round(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 };
 
-const formatPhone = (raw: string): string => {
-  const d = String(raw || '').replace(/\D/g, '');
-  if (!d) return '';
-  if (d.length <= 5) return d;
-  return `${d.slice(0, Math.max(0, d.length - 5))} ${d.slice(-5)}`.trim();
-};
-
 const formatBankAccount = (raw: string): string => {
   const d = String(raw || '').replace(/\D/g, '');
   if (!d) return '';

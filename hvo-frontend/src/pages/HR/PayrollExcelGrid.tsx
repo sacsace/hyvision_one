@@ -82,6 +82,8 @@ type Props = {
   companyId?: string | number | null;
   companyStateCode?: string | null;
   payrollMonth?: string | null;
+  /** 컬럼 툴바 우측(예: 급여 생성 완료) */
+  toolbarExtra?: React.ReactNode;
 };
 
 const PayrollExcelGrid: React.FC<Props> = ({
@@ -98,7 +100,8 @@ const PayrollExcelGrid: React.FC<Props> = ({
   allowOpenPayslip = true,
   companyId = null,
   companyStateCode = null,
-  payrollMonth = null
+  payrollMonth = null,
+  toolbarExtra = null,
 }) => {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -475,12 +478,17 @@ const PayrollExcelGrid: React.FC<Props> = ({
         >
           {t('payrollManagement.actions.editConstants')}
         </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ ml: { sm: 0.5 } }}>
+        <Typography variant="caption" color="text.secondary" sx={{ ml: { sm: 0.5 }, flex: '1 1 auto' }}>
           {t('payrollManagement.columnToolbarHint')}
           {` · ${t('payrollManagement.salaryRatiosShort', {
             summary: salaryRatios.parts.map((p) => `${p.label} ${p.pct}%`).join(' / '),
           })}`}
         </Typography>
+        {toolbarExtra ? (
+          <Box sx={{ display: 'inline-flex', ml: { xs: 0, sm: 'auto' }, flexShrink: 0 }}>
+            {toolbarExtra}
+          </Box>
+        ) : null}
       </Box>
 
       <Box

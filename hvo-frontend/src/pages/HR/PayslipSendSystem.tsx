@@ -30,7 +30,7 @@ import type { PayrollGridRow } from './payroll/payrollGridTypes';
 import { formatOtHourDisplay } from './payroll/payrollGridUtils';
 import { generatePayslipPdfBlob, payslipBlobToBase64 } from './payrollPayslipPdf';
 import { payrollService } from '../../services/api';
-import { shortCompanyName, type PayslipCompanyInfo } from './PayslipContent';
+import { shortCompanyName, type PayslipCompanyInfo, toPayslipCompanyInfo } from './PayslipContent';
 import {
   hvoBodyCardSx,
   hvoBodyListTableSx,
@@ -682,14 +682,7 @@ const PayslipSendSystem: React.FC = () => {
     void useReferenceDataStore
       .getState()
       .fetchCompanyById(Number(user.company_id))
-      .then((company) =>
-        setCompanyInfo({
-          name: company?.name || '',
-          address: company?.address || '',
-          phone: company?.phone || company?.phone_number || '',
-          email: company?.email || '',
-        })
-      )
+      .then((company) => setCompanyInfo(toPayslipCompanyInfo(company)))
       .catch(() => setCompanyInfo(null));
   }, [user?.company_id]);
 

@@ -1015,6 +1015,9 @@ const NoticeManagement: React.FC = () => {
         setSuccess('공지사항이 성공적으로 삭제되었습니다.');
         setDeleteDialogOpen(false);
         setNoticeToDelete(null);
+        setSelectedNotice(null);
+        setIsEditing(false);
+        setViewMode('list');
         loadData();
       } else {
         setError(response.message || '삭제 중 오류가 발생했습니다.');
@@ -2319,7 +2322,7 @@ const NoticeManagement: React.FC = () => {
                   </Typography>
                 </Box>
               )}
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
                 {isEditing ? (
                   <>
                     <Button
@@ -2336,20 +2339,118 @@ const NoticeManagement: React.FC = () => {
                     </Button>
                   </>
                 ) : (
-                  canUserEditNotice(selectedNotice) && (
-                    <Button
-                      variant="outlined"
-                      startIcon={<EditIcon />}
-                      onClick={() => handleEditNotice(selectedNotice)}
-                    >
-                      {txt('수정', 'Edit')}
-                    </Button>
-                  )
+                  <>
+                    {canUserEditNotice(selectedNotice) && (
+                      <Button
+                        variant="outlined"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleEditNotice(selectedNotice)}
+                      >
+                        {txt('수정', 'Edit')}
+                      </Button>
+                    )}
+                    {noticeMenuFlags.canDelete && (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        disabled={noticeMenuFlags.menusLoading}
+                        onClick={() => handleDeleteNotice(selectedNotice)}
+                      >
+                        {txt('삭제', 'Delete')}
+                      </Button>
+                    )}
+                  </>
                 )}
               </Box>
             </Box>
           </CardContent>
         </Card>
+
+        <Snackbar
+          open={!!error}
+          autoHideDuration={6000}
+          onClose={() => setError('')}
+        >
+          <Alert onClose={() => setError('')} severity="error">
+            {error}
+          </Alert>
+        </Snackbar>
+        <Snackbar
+          open={!!success}
+          autoHideDuration={6000}
+          onClose={() => setSuccess('')}
+        >
+          <Alert onClose={() => setSuccess('')} severity="success">
+            {success}
+          </Alert>
+        </Snackbar>
+
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => {
+            setDeleteDialogOpen(false);
+            setNoticeToDelete(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            pb: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider'
+          }}>
+            <WarningIcon sx={{ color: 'error.main', fontSize: 28 }} />
+            <Typography variant="h6" fontWeight={600}>
+              {txt('공지사항 삭제 확인', 'Confirm delete notice')}
+            </Typography>
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <DialogContentText sx={{ mb: 2, fontSize: '1rem' }}>
+              {txt('정말로 이 공지사항을 삭제하시겠습니까?', 'Are you sure you want to delete this notice?')}
+            </DialogContentText>
+            {noticeToDelete && (
+              <Box sx={{
+                p: 2,
+                bgcolor: 'grey.50',
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider'
+              }}>
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                  {noticeToDelete.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {txt('작성자', 'Author')}: {noticeToDelete.author}
+                </Typography>
+              </Box>
+            )}
+            <DialogContentText sx={{ mt: 2, color: 'error.main', fontSize: '0.875rem' }}>
+              {txt('이 작업은 되돌릴 수 없습니다. 삭제된 공지사항은 복구할 수 없습니다.', 'This cannot be undone. Deleted notices cannot be restored.')}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setNoticeToDelete(null);
+              }}
+            >
+              {txt('취소', 'Cancel')}
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={confirmDeleteNotice}
+            >
+              {txt('삭제', 'Delete')}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   }

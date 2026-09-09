@@ -6,7 +6,7 @@ export type AppLanguage = 'ko' | 'en';
 
 const loadedLanguages = new Set<string>(['ko']);
 
-/** OS/브라우저 언어: 한국어면 ko, 그 외는 모두 en */
+/** OS/브라우저(PC·모바일) 언어: 한국어면 ko, 그 외는 모두 en */
 export function detectOsLanguage(): AppLanguage {
   if (typeof navigator === 'undefined') return 'en';
   const candidates = [
@@ -16,6 +16,13 @@ export function detectOsLanguage(): AppLanguage {
     .filter(Boolean)
     .map((v) => String(v).toLowerCase());
   return candidates.some((l) => l.startsWith('ko')) ? 'ko' : 'en';
+}
+
+export function resolveAppLanguage(lng?: string | null): AppLanguage {
+  const raw = String(lng || '').toLowerCase();
+  if (raw.startsWith('ko')) return 'ko';
+  if (raw.startsWith('en')) return 'en';
+  return detectOsLanguage();
 }
 
 /** 비활성 언어 번역은 필요 시에만 동적 로드 */
@@ -30,20 +37,40 @@ export async function ensureI18nLanguage(lang: AppLanguage): Promise<void> {
 
 const SEO_FALLBACK: Record<AppLanguage, { title: string; description: string }> = {
   ko: {
-    title: 'Hyvision One - Integrated ERP for Hyvision India',
-    description: 'Hyvision One - Integrated ERP for Hyvision India',
+    title: 'Hyvision One - 하이비전 인도 통합 ERP',
+    description: 'Hyvision One - Hyvision India를 위한 통합 ERP·시스템 인티그레이션 플랫폼',
   },
   en: {
     title: 'Hyvision One - Integrated ERP for Hyvision India',
-    description: 'Hyvision One - Integrated ERP for Hyvision India',
+    description:
+      'Hyvision One - Integrated ERP and system integration platform optimized for Hyvision India',
   },
 };
 
-/** 활성 UI 언어에 맞춰 SEO 메타(title/description/html lang) 동기화 */
+const setMetaByName = (name: string, content: string) => {
+  let tag = document.querySelector(`meta[name="${name}"]`);
+  if (!tag) {
+    tag = document.createElement('meta');
+    tag.setAttribute('name', name);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute('content', content);
+};
+
+const setMetaByProperty = (property: string, content: string) => {
+  let tag = document.querySelector(`meta[property="${property}"]`);
+  if (!tag) {
+    tag = document.createElement('meta');
+    tag.setAttribute('property', property);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute('content', content);
+};
+
+/** 활성 UI/기기 언어에 맞춰 SEO 메타(title/description/html lang/OG) 동기화 */
 export const syncDocumentSeo = (lng?: string) => {
   if (typeof document === 'undefined') return;
-  const raw = String(lng || i18n.language || detectOsLanguage()).toLowerCase();
-  const lang: AppLanguage = raw.startsWith('en') ? 'en' : 'ko';
+  const lang = resolveAppLanguage(lng || i18n.language || detectOsLanguage());
   document.documentElement.lang = lang;
 
   const titleKey = i18n.t('seo.title', { lng: lang });
@@ -54,23 +81,33 @@ export const syncDocumentSeo = (lng?: string) => {
     descKey && descKey !== 'seo.description' ? descKey : SEO_FALLBACK[lang].description;
 
   document.title = title;
-  const descTag = document.querySelector('meta[name="description"]');
-  if (descTag) descTag.setAttribute('content', description);
+  setMetaByName('description', description);
+  setMetaByName('application-name', 'Hyvision One');
+  setMetaByName('apple-mobile-web-app-title', 'Hyvision One');
+  setMetaByName('twitter:card', 'summary');
+  setMetaByName('twitter:title', title);
+  setMetaByName('twitter:description', description);
+  setMetaByProperty('og:type', 'website');
+  setMetaByProperty('og:site_name', 'Hyvision One');
+  setMetaByProperty('og:title', title);
+  setMetaByProperty('og:description', description);
+  setMetaByProperty('og:locale', lang === 'ko' ? 'ko_KR' : 'en_IN');
+  setMetaByProperty('og:locale:alternate', lang === 'ko' ? 'en_IN' : 'ko_KR');
 };
 
 const initialOsLang = detectOsLanguage();
 
 // 언어는 OS 기본값 → 사용자 UI 설정(API / 메뉴 스토어)으로 동기화
 i18n.use(initReactI18next).init({
-    resources: {
+  resources: {
     ko,
-    },
+  },
   lng: initialOsLang,
   fallbackLng: initialOsLang === 'en' ? 'en' : 'ko',
-    interpolation: {
+  interpolation: {
     escapeValue: false,
-    },
-    react: {
+  },
+  react: {
     useSuspense: false,
   },
 });

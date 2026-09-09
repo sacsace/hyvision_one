@@ -1,8 +1,9 @@
-export default {
+const en = {
   translation: {
     seo: {
       title: 'Hyvision One - Integrated ERP for Hyvision India',
-      description: 'Hyvision One - Integrated ERP for Hyvision India',
+      description:
+        'Hyvision One - Integrated ERP and system integration platform optimized for Hyvision India',
     },
     common: {
       processing: 'Processing...',
@@ -448,7 +449,7 @@ export default {
       excelExport: 'Export Excel',
       excelImport: 'Bulk register',
       bulkRegisterHint:
-        'Download the sample Excel, fill it in, then upload to register multiple users at once. Required: User ID, Name, Email, Password. Missing departments are created automatically; duplicate emails are skipped.',
+        'Download the sample Excel, fill it in, then upload to register multiple users at once. Required: User ID, Name, Email, Password. Missing departments are created automatically. Soft-deleted accounts are restored; only active duplicates are skipped.',
       search: 'Search by name, email, employee number...',
       company: 'Company',
       allCompanies: 'All',
@@ -617,7 +618,7 @@ export default {
       excelImportError: 'Failed to import Excel file.',
       excelImportTitle: 'Bulk register new users',
       excelImportDesc:
-        'Select an Excel (.xlsx) file matching the sample template. Missing departments/job titles are created automatically. Duplicate email or user ID rows are skipped.',
+        'Select an Excel (.xlsx) file matching the sample template. Missing departments/job titles are created automatically. Soft-deleted users are restored; only active email or user ID duplicates are skipped.',
       selectedFile: 'Selected file',
       importResultTitle: 'Import result',
       importSuccessSummary: '{{success}} of {{total}} succeeded',
@@ -1091,7 +1092,7 @@ export default {
     },
     menuPermissionManagement: {
       title: 'Menu Permission Management',
-      description: 'Manage menu access permissions by company and user with Root privileges.',
+      description: 'Manage menu access permissions by user with Root privileges.',
       select: 'Select',
       userSearch: 'User Search',
       userSearchPlaceholder: 'Search by name, role...',
@@ -1116,8 +1117,8 @@ export default {
       permissionDelegation: 'Permission Delegation',
       loading: 'Loading...',
       noMenus: 'No menus found.',
-      selectUserOrCompany: 'Please select a user or company.',
-      emptyPanelHint: 'Choose a user or company in the list on the left to edit menu permissions.',
+      selectUserOrCompany: 'Please select a user.',
+      emptyPanelHint: 'Choose a user in the list on the left to edit menu permissions.',
       permissionsSaved: 'Permissions saved successfully.',
       permissionsSaveFailed: 'Failed to save permissions.',
       companyPermissionsSaved: 'Permissions saved for {{count}} users.',
@@ -1564,6 +1565,11 @@ export default {
         companyName: 'Company',
         companyContact: 'Company contact',
         downloadPdf: 'Download PDF',
+        downloadAllTitle: 'Download all payslips',
+        downloadAllProgress: 'Generating payslips {{current}}/{{total}}…',
+        downloadAllDone: 'Downloaded payslip ZIP ({{count}} files).',
+        downloadAllFailed: 'Failed to download payslip ZIP.',
+        downloadAllNoRows: 'No payroll rows to download. Check the pay month.',
         sendTitle: 'Send payslips',
         sendRequiresComplete:
           'Complete “Payroll generation” for the selected pay month before sending. (Uses the pay month in the payroll dialogs.)',
@@ -5029,6 +5035,9 @@ export default {
       leaveBalancesHint:
         'Total annual leave uses the intersection of the India fiscal year (1 Apr – 31 Mar), hire date, and leave eligibility. One day per accrual month; the Leave year column shows each employee’s accrual window. Hire month excluded except 4/1 hires; +1 month skip for 31st hires; mid-month eligibility skips that month.',
       leaveBalancesSearchPlaceholder: 'Search by employee, department, position, join date…',
+      leaveHistoryTitle: 'Leave history',
+      leaveHistoryEmpty: 'No leave requests for this employee.',
+      leaveHistoryHint: 'Click an employee name to view past leave records.',
       sickOptional: 'Optional',
       sickOptionalHint: 'Sick leave is not mandatory.',
       optionalLeave: 'Optional',
@@ -5504,3 +5513,5 @@ export default {
     }
   }
 };
+
+export default en;

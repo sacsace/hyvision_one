@@ -201,3 +201,62 @@ export async function payslipBlobToBase64(blob: Blob): Promise<string> {
     r.readAsDataURL(blob);
   });
 }
+
+function uniquePayslipZipEntryName(baseFilename: string, used: Set<string>): string {
+  const trimmed = String(baseFilename || 'Payslip.pdf').replace(/[\\/]+/g, '_');
+  if (!used.has(trimmed.toLowerCase())) {
+    used.add(trimmed.toLowerCase());
+    return trimmed;
+  }
+  const dot = trimmed.lastIndexOf('.');
+  const stem = dot > 0 ? trimmed.slice(0, dot) : trimmed;
+  const ext = dot > 0 ? trimmed.slice(dot) : '.pdf';
+  let n = 2;
+  while (used.has(`${stem} (${n})${ext}`.toLowerCase())) n += 1;
+  const next = `${stem} (${n})${ext}`;
+  used.add(next.toLowerCase());
+  return next;
+}
+
+/** 선택 급여월 전 직원 명세서를 ZIP으로 묶어 다운로드 */
+export async function downloadAllPayslipsAsZip(
+  rows: PayrollGridRow[],
+  companyInfo?: PayslipCompanyInfo | null,
+  options?: {
+    headerLayout?: PayslipHeaderLayout;
+    companyId?: string | number | null;
+    periodLabel?: string | null;
+    onProgress?: (current: number, total: number) => void;
+  }
+): Promise<{ count: number; filename: string }> {
+  if (!rows.length) {
+    throw new Error('NO_ROWS');
+  }
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  const usedNames = new Set<string>();
+  const total = rows.length;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    options?.onProgress?.(i + 1, total);
+    const blob = await generatePayslipPdfBlob(row, companyInfo, {
+      locale: 'en',
+      headerLayout: options?.headerLayout || 'standard',
+      companyId: options?.companyId ?? null,
+    });
+    const baseName = buildPayslipPdfFilename(
+      row.working_month || options?.periodLabel,
+      row.employee_name || row.emp_id || `Employee-${i + 1}`
+    );
+    zip.file(uniquePayslipZipEntryName(baseName, usedNames), blob);
+  }
+
+  const period =
+    String(options?.periodLabel || rows[0]?.working_month || '').trim() || 'Unknown';
+  const zipFilename = `Payslips (${period}).zip`.replace(/[\\/:*?"<>|]/g, '_');
+  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  downloadPayslipPdf(zipBlob, zipFilename);
+  return { count: total, filename: zipFilename };
+}

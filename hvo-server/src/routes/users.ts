@@ -2219,7 +2219,9 @@ router.post(
       }
     }
 
-    // 2단계: 사용자 등록 (중복은 제외하고 계속)
+    const isLiveUser = (u: any) => u != null && String(u.status || '') !== 'inactive';
+
+    // 2단계: 사용자 등록 (활성 중복만 제외, 비활성은 복구)
     for (let i = 0; i < data.length; i++) {
       const row = data[i] as any;
       try {
@@ -2263,14 +2265,15 @@ router.post(
           continue;
         }
 
-        // DB 중복 사용자ID → 제외 후 나머지 계속
-        const existingUser = await (User as any).findOne({
-          where: {
-            userid: { [Op.iLike]: userid }
-          }
+        const existingByUserid = await (User as any).findOne({
+          where: { userid: { [Op.iLike]: userid } }
+        });
+        const existingByEmail = await (User as any).findOne({
+          where: { email: { [Op.iLike]: email } }
         });
 
-        if (existingUser) {
+        // 활성(또는 정지) 계정과 충돌하면 제외
+        if (isLiveUser(existingByUserid)) {
           results.skipped.push({
             row: i + 2,
             data: row,
@@ -2278,15 +2281,7 @@ router.post(
           });
           continue;
         }
-
-        // DB 중복 이메일 → 제외 (메일 주소는 중복 불가)
-        const existingEmail = await (User as any).findOne({
-          where: {
-            email: { [Op.iLike]: email }
-          }
-        });
-
-        if (existingEmail) {
+        if (isLiveUser(existingByEmail)) {
           results.skipped.push({
             row: i + 2,
             data: row,
@@ -2295,8 +2290,21 @@ router.post(
           continue;
         }
 
-        seenUserids.add(userid.toLowerCase());
-        seenEmails.add(email);
+        // 비활성 행이 서로 다르면(userid ↔ email 다른 계정) 복구 불가
+        if (
+          existingByUserid &&
+          existingByEmail &&
+          Number(existingByUserid.id) !== Number(existingByEmail.id)
+        ) {
+          results.failed.push({
+            row: i + 2,
+            data: row,
+            error: '삭제된 사용자ID와 이메일이 서로 다른 계정에 연결되어 복구할 수 없습니다.'
+          });
+          continue;
+        }
+
+        const restoreTarget = existingByUserid || existingByEmail || null;
 
         // 회사 ID 결정 (root는 company_id를 선택할 수 있음)
         let finalCompanyId = defaultCompanyId;
@@ -2305,8 +2313,11 @@ router.post(
           if (Number.isFinite(parsed)) finalCompanyId = parsed;
         }
 
-        // 사원번호 자동 생성 (없는 경우)
+        // 사원번호: 엑셀 값 → 복구 시 기존 값 유지 → 없으면 자동 생성
         let employeeNumber = row['사원번호']?.toString().trim() || '';
+        if (!employeeNumber && restoreTarget?.employee_number) {
+          employeeNumber = String(restoreTarget.employee_number);
+        }
         if (!employeeNumber && finalCompanyId) {
           const company = await (Company as any).findByPk(finalCompanyId);
           if (company) {
@@ -2314,7 +2325,8 @@ router.post(
             const lastUser = await (User as any).findOne({
               where: {
                 company_id: finalCompanyId,
-                employee_number: { [Op.like]: `${abbreviation}-%` }
+                employee_number: { [Op.like]: `${abbreviation}-%` },
+                ...(restoreTarget ? { id: { [Op.ne]: restoreTarget.id } } : {}),
               },
               order: [['employee_number', 'DESC']]
             });
@@ -2357,6 +2369,9 @@ router.post(
           continue;
         }
 
+        seenUserids.add(userid.toLowerCase());
+        seenEmails.add(email);
+
         const deptResolved = await resolveOrgByName(
           'dept',
           row['부서'] ? row['부서'].toString() : '',
@@ -2368,8 +2383,11 @@ router.post(
           finalCompanyId
         );
 
-        // 사용자 생성
-        const user = await (User as any).create({
+        const nextStatus = (row['상태 (active/inactive/suspended)'] && ['active', 'inactive', 'suspended'].includes(row['상태 (active/inactive/suspended)'].toString().toLowerCase()))
+          ? row['상태 (active/inactive/suspended)'].toString().toLowerCase()
+          : 'active';
+
+        const payload = {
           tenant_id: tenantId,
           company_id: finalCompanyId,
           userid,
@@ -2399,10 +2417,18 @@ router.post(
             if (raw == null || String(raw).trim() === '' || String(raw).trim() === '**') return null;
             return parseSalaryInput(raw);
           })(),
-          status: (row['상태 (active/inactive/suspended)'] && ['active', 'inactive', 'suspended'].includes(row['상태 (active/inactive/suspended)'].toString().toLowerCase()))
-            ? row['상태 (active/inactive/suspended)'].toString().toLowerCase()
-            : 'active'
-        });
+          status: nextStatus,
+        };
+
+        let user: any;
+        let restored = false;
+        if (restoreTarget) {
+          await restoreTarget.update(payload);
+          user = restoreTarget;
+          restored = true;
+        } else {
+          user = await (User as any).create(payload);
+        }
 
         try {
           await grantEmployeeSelfServicePermissions({
@@ -2417,7 +2443,8 @@ router.post(
         results.success.push({
           row: i + 2,
           userid: row['사용자ID'],
-          username: row['이름']
+          username: row['이름'],
+          restored,
         });
       } catch (error: any) {
         const msg = String(error?.message || '');
@@ -2441,9 +2468,12 @@ router.post(
     }
 
     const skipCount = results.skipped.length;
+    const restoredCount = results.success.filter((s: any) => s.restored).length;
+    const createdCount = results.success.length - restoredCount;
     const deptCreated = results.departments_created.length;
     const parts = [
-      `총 ${results.total}건 중 ${results.success.length}건 등록`,
+      `총 ${results.total}건 중 ${createdCount}건 신규 등록` +
+        (restoredCount > 0 ? `, ${restoredCount}건 삭제 계정 복구` : ''),
       skipCount > 0 ? `${skipCount}건 중복 제외` : null,
       deptCreated > 0 ? `부서 ${deptCreated}개 자동 등록` : null,
       results.positions_created.length > 0 ? `직책 ${results.positions_created.length}개 자동 등록` : null,

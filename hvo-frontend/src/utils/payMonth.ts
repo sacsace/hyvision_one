@@ -17,6 +17,24 @@ export function normalizePayMonth(period: string | null | undefined): string | n
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+/** 앱 언어에 맞춘 급여월 표시 (en: July 2026, ko: 2026년 7월) */
+export function formatPayMonthLabel(
+  period: string | null | undefined,
+  language?: string | null
+): string {
+  const ym = normalizePayMonth(period);
+  if (!ym) return String(period ?? '').trim();
+  const [yStr, mStr] = ym.split('-');
+  const year = Number(yStr);
+  const month = Number(mStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return ym;
+  const locale = language?.startsWith('en') ? 'en-US' : 'ko-KR';
+  return new Date(year, month - 1, 1).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+  });
+}
+
 /** `YYYY-MM`이 오늘 기준 이번 달보다 이후(미래 월)이면 true */
 export function isPayMonthAfterCurrent(ym: string | null | undefined): boolean {
   const n = normalizePayMonth(ym);
