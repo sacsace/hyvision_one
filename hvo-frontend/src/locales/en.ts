@@ -95,15 +95,19 @@ const en = {
     },
     companyPolicies: {
       title: 'Company Policies',
-      subtitle: 'View employment, attendance, leave, payroll, confidentiality, POSH, and separation policies. Company admins can edit; all changes are logged.',
+      subtitle:
+        'View employment, attendance, leave, payroll, confidentiality, POSH, and separation policies. Company admins can add or remove tabs and edit content; all changes are logged.',
       empty: 'No policies to display.',
       emptyContent: 'No content has been registered.',
-      readOnlyHint: 'Employees can view only. Editing is limited to company admins.',
+      readOnlyHint: 'Employees can view only. Adding, deleting, and editing tabs is limited to company admins.',
       version: 'Version {{version}}',
       updatedBy: 'Updated by {{name}}',
       historyTitle: 'Change history',
       historyEmpty: 'No change history yet.',
       revisionTitle: 'Version {{version}} content',
+      addTabHint: 'New tabs need Korean and English titles. Add content afterward with Edit.',
+      confirmDeleteTab:
+        'Delete the “{{name}}” tab? It will be hidden from the list; history is kept.',
       tabs: {
         employment: 'Employment Policy',
         attendance: 'Attendance Policy',
@@ -126,12 +130,21 @@ const en = {
         save: 'Save',
         history: 'History',
         viewRevision: 'View content',
+        addTab: 'Add tab',
+        deleteTab: 'Delete tab',
       },
-      success: { saved: 'Company policy saved.' },
+      success: {
+        saved: 'Company policy saved.',
+        created: 'Policy tab added.',
+        deleted: 'Policy tab deleted.',
+      },
       errors: {
         loadFailed: 'Failed to load company policies.',
         saveFailed: 'Failed to save company policy.',
         historyFailed: 'Failed to load change history.',
+        createFailed: 'Failed to add policy tab.',
+        deleteFailed: 'Failed to delete policy tab.',
+        titleRequired: 'Please enter both Korean and English titles.',
       },
     },
     app: {

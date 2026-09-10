@@ -85,6 +85,7 @@ import { findMenuIdByPath } from '../../utils/findMenuByPath';
 import { vacationService } from '../../services/api';
 import { getUploadUrl } from '../../utils/uploadUrl';
 import { useTranslation } from 'react-i18next';
+import { formatPositionLabel } from '../../utils/positionLabels';
 import DepartmentLeaveCalendar, { CALENDAR_DEPARTMENT_ALL_VALUE } from './DepartmentLeaveCalendar';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import PromptDialog from '../../components/Common/PromptDialog';
@@ -2948,14 +2949,20 @@ const VacationManagement: React.FC = () => {
                         {selectedVacation.employeeName}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {selectedVacation.department} • {selectedVacation.position}
+                        {selectedVacation.department}
+                        {selectedVacation.department && selectedVacation.position ? ' • ' : ''}
+                        {formatPositionLabel(
+                          selectedVacation.position,
+                          i18n.language?.startsWith('en') ? 'en' : 'ko',
+                          false
+                        )}
                       </Typography>
                     </Box>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    휴가 유형
+                    {t('vacationManagement.leaveType')}
                   </Typography>
                   <Box sx={{ mb: 2 }}>
                     {getTypeChip(selectedVacation.vacationType, selectedVacation.isHalfDay)}
@@ -2963,7 +2970,7 @@ const VacationManagement: React.FC = () => {
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    기간
+                    {t('vacationManagement.period')}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                     <CalendarIcon sx={{ mr: 1, color: 'text.secondary' }} />

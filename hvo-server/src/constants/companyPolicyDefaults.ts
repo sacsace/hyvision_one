@@ -1,4 +1,4 @@
-/** 회사 정책 탭 키 (고정) */
+/** 회사 정책 기본(시스템) 탭 키 — 최초 시드용. 이후 관리자가 커스텀 탭을 추가할 수 있음. */
 export const COMPANY_POLICY_KEYS = [
   'employment',
   'attendance',
