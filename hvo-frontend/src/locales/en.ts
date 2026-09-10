@@ -4715,10 +4715,10 @@ const en = {
       showPassword: 'Show password',
       hidePassword: 'Hide password',
       cardTitle: 'Log in',
-      brandName: 'Hyvision One',
+      brandName: 'Hyvision One ERP',
       brandTagline: 'Integrated ERP for Hyvision India',
       heroCompany: 'HyVISION SYSTEM INDIA PRIVATE LIMITED',
-      heroProductName: 'Hyvision One',
+      heroProductName: 'Hyvision One ERP',
       heroProductLine: 'System Integration · ERP',
       heroHeadline: "Leading India's Future of Manufacturing",
       heroSubtext:
