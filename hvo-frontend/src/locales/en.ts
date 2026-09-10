@@ -4733,7 +4733,7 @@ const en = {
       showPassword: 'Show password',
       hidePassword: 'Hide password',
       cardTitle: 'Log in',
-      brandName: 'Hyvision One ERP',
+      brandName: 'ERP System',
       brandTagline: 'Integrated ERP for Hyvision India',
       heroCompany: 'HyVISION SYSTEM INDIA PRIVATE LIMITED',
       heroProductName: 'Hyvision One',

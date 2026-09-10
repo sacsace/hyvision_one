@@ -4801,7 +4801,7 @@ const ko = {
       showPassword: '비밀번호 표시',
       hidePassword: '비밀번호 숨기기',
       cardTitle: '로그인',
-      brandName: 'Hyvision One ERP',
+      brandName: 'ERP System',
       brandTagline: 'Integrated ERP for Hyvision India',
       heroCompany: 'HyVISION SYSTEM INDIA PRIVATE LIMITED',
       heroProductName: 'Hyvision One',
