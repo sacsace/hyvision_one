@@ -72,9 +72,22 @@ export type PayslipCompanyInfo = {
   address?: string;
   phone?: string;
   email?: string;
+  website?: string;
+  gstNumbers?: string[];
+  panNumber?: string;
+  msmeNumber?: string;
+  iecNumber?: string;
   /** data URL 또는 업로드 URL */
   logo?: string;
 };
+
+function normalizeGstNumbers(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.map((g) => String(g || '').trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string' && raw.trim()) return [raw.trim()];
+  return [];
+}
 
 /** 회사 API/캐시 객체를 명세서용 정보로 변환 */
 export function toPayslipCompanyInfo(company: any): PayslipCompanyInfo {
@@ -85,6 +98,11 @@ export function toPayslipCompanyInfo(company: any): PayslipCompanyInfo {
     address: company?.address || '',
     phone: company?.phone || company?.phone_number || '',
     email: company?.email || '',
+    website: company?.website || '',
+    gstNumbers: normalizeGstNumbers(company?.gst_numbers ?? company?.gst_number),
+    panNumber: String(company?.pan_number || '').trim(),
+    msmeNumber: String(company?.msme_number || '').trim(),
+    iecNumber: String(company?.iec_number || '').trim(),
     logo: logoTrimmed ? getUploadUrl(logoTrimmed) || logoTrimmed : '',
   };
 }
@@ -499,7 +517,7 @@ function PayslipHeader({
   workingMonth,
   paidDays,
   companyName,
-  companyContact,
+  companyDetailLines,
   companyLogo,
   forPdf,
   layout = 'standard'
@@ -510,7 +528,7 @@ function PayslipHeader({
   workingMonth: string;
   paidDays: string;
   companyName: string;
-  companyContact: string;
+  companyDetailLines: string[];
   companyLogo?: string;
   forPdf?: boolean;
   layout?: PayslipHeaderLayout;
@@ -520,7 +538,9 @@ function PayslipHeader({
     { label: labels.paidDays, value: displayText(paidDays) }
   ].filter((item) => item.value);
   const logoSrc = String(companyLogo || '').trim();
-  const showCompanyBlock = layout !== 'compact' && (companyName !== '—' || Boolean(logoSrc));
+  const detailLines = companyDetailLines.filter((line) => !!String(line || '').trim());
+  const showCompanyBlock =
+    layout !== 'compact' && (companyName !== '—' || Boolean(logoSrc) || detailLines.length > 0);
 
   return (
     <Box
@@ -618,18 +638,18 @@ function PayslipHeader({
             order={layout === 'companyFirst' ? 1 : 2}
             sx={{
               ...hvoInnerCardSx,
-              flex: forPdf ? '0 1 340px' : { md: '0 1 340px' },
+              flex: forPdf ? '0 1 380px' : { md: '0 1 380px' },
               width: forPdf ? 'auto' : { xs: '100%', md: 'auto' },
               py: 1.5,
               px: 1.75,
               borderRadius: '8px',
-              overflow: 'hidden'
+              overflow: 'visible',
             }}
           >
             {logoSrc ? (
               <Box
                 sx={{
-                  mb: companyName !== '—' || companyContact ? 1 : 0,
+                  mb: companyName !== '—' || detailLines.length ? 1 : 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'flex-start',
@@ -659,10 +679,25 @@ function PayslipHeader({
                 {companyName}
               </Typography>
             ) : null}
-            {companyContact ? (
-              <Typography sx={{ ...hvoPageDescriptionSx, fontSize: '0.72rem', mt: 0.5, lineHeight: 1.45 }}>
-                {companyContact}
-              </Typography>
+            {detailLines.length > 0 ? (
+              <Box sx={{ mt: 0.6, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                {detailLines.map((line) => (
+                  <Typography
+                    key={line}
+                    sx={{
+                      ...hvoPageDescriptionSx,
+                      fontSize: '0.72rem',
+                      lineHeight: 1.45,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                      overflow: 'visible',
+                      textOverflow: 'unset',
+                    }}
+                  >
+                    {line}
+                  </Typography>
+                ))}
+              </Box>
             ) : null}
           </Box>
         ) : null}
@@ -704,9 +739,30 @@ const PayslipContent = React.forwardRef<HTMLDivElement, Props>(function PayslipC
     dayHours > 0 ? `${labels.dayOt} (${formatOtHourDisplay(dayHours)}h)` : labels.dayOt;
 
   const companyName = shortCompanyName(companyInfo?.name) || '—';
-  const companyContact = [companyInfo?.address, companyInfo?.phone, companyInfo?.email]
-    .filter((x) => !!String(x || '').trim())
-    .join(' · ');
+  const companyDetailLines = (() => {
+    const lines: string[] = [];
+    const address = String(companyInfo?.address || '').trim();
+    const phone = String(companyInfo?.phone || '').trim();
+    const email = String(companyInfo?.email || '').trim();
+    const website = String(companyInfo?.website || '').trim();
+    if (address) lines.push(address);
+    if (phone) lines.push(phone);
+    if (email) lines.push(email);
+    if (website) lines.push(website);
+    const gstList = Array.isArray(companyInfo?.gstNumbers) ? companyInfo!.gstNumbers! : [];
+    gstList.forEach((gst, idx) => {
+      const g = String(gst || '').trim();
+      if (!g) return;
+      lines.push(gstList.length > 1 ? `GSTIN ${idx + 1}: ${g}` : `GSTIN: ${g}`);
+    });
+    const pan = String(companyInfo?.panNumber || '').trim();
+    const msme = String(companyInfo?.msmeNumber || '').trim();
+    const iec = String(companyInfo?.iecNumber || '').trim();
+    if (pan) lines.push(`PAN: ${pan}`);
+    if (msme) lines.push(`MSME: ${msme}`);
+    if (iec) lines.push(`IEC: ${iec}`);
+    return lines;
+  })();
 
   // 엑셀 등에서 넘어온 수당 행이 있으면 리스트(열) 그대로 표시
   const customLines = Array.isArray(row.payslip_earning_lines) ? row.payslip_earning_lines : [];
@@ -788,7 +844,7 @@ const PayslipContent = React.forwardRef<HTMLDivElement, Props>(function PayslipC
           workingMonth={displayText(row.working_month)}
           paidDays={displayText(row.days_worked)}
           companyName={companyName}
-          companyContact={companyContact}
+          companyDetailLines={companyDetailLines}
           companyLogo={companyInfo?.logo}
           forPdf={forPdf}
           layout={headerLayout}

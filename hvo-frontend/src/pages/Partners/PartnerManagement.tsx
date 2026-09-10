@@ -25,6 +25,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
   Tooltip,
   Snackbar,
   Alert,
@@ -48,6 +51,7 @@ import {
   FileDownload as FileDownloadIcon,
   RestartAlt as ResetIcon,
   MoreHoriz as MoreHorizIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { api, partnerService } from '../../services/api';
@@ -111,6 +115,68 @@ const listViewModeBtnSx = {
 
 const PARTNER_FILTER_OUTLINED = hvoOutlinedLabelProps;
 const partnerFilterFieldSx = { ...hvoSearchFieldSx, ...hvoFilterFieldHeightSx } as const;
+
+/** 생성/수정 폼 아코디언 — 사용자 등록과 동일한 섹션 카드 */
+function getAccordionFormSx(_theme: Theme) {
+  return {
+    '&:before': { display: 'none' },
+    boxShadow: 'none',
+    border: '1px solid #CBD5E1',
+    borderRadius: '8px',
+    mb: 1,
+    bgcolor: '#FFFFFF',
+    overflow: 'hidden' as const,
+    '&:last-of-type': { mb: 0 },
+    '& .MuiAccordionSummary-root': {
+      minHeight: '40px !important',
+      py: 0,
+      px: 1.25,
+      bgcolor: '#E2E8F0',
+      borderBottom: '1px solid #CBD5E1',
+      borderRadius: '8px 8px 0 0',
+      '&.Mui-expanded': {
+        minHeight: '40px !important',
+        borderBottom: '1px solid #CBD5E1',
+      },
+    },
+    '& .MuiAccordionSummary-content': {
+      my: '6px !important',
+      '&.Mui-expanded': { my: '6px !important' },
+    },
+    '& .MuiAccordionSummary-expandIconWrapper': { py: 0 },
+    '& .MuiAccordionDetails-root': {
+      pt: 2,
+      pb: 1.25,
+      px: 1.25,
+    },
+    '&.MuiAccordion-root.Mui-expanded': {
+      borderRadius: '8px',
+    },
+    '&.MuiAccordion-root:not(:first-of-type)': {
+      mt: 0,
+    },
+  };
+}
+
+const partnerFormSectionTitleSx = {
+  fontSize: '0.8125rem',
+  fontWeight: 700,
+  letterSpacing: '-0.01em',
+  lineHeight: 1.25,
+  color: 'text.primary',
+} as const;
+
+const partnerFormGridSx = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+  gap: 1.5,
+} as const;
+
+const partnerFormFieldLabelSx = {
+  fontSize: '0.875rem',
+  fontWeight: 500,
+  color: 'text.primary',
+} as const;
 
 const PART_COL_DEFAULTS: Record<string, number> = {
   select: 48,
@@ -500,24 +566,26 @@ const PartnerManagement: React.FC = () => {
       return;
     }
 
-    // GST 번호 검증: 최소 1개 이상, 빈 값 제거 (파트너 마스터만)
-    const validGstNumbers = formData.gstNumbers.filter(gst => gst.trim() !== '');
+    // GST 번호: 선택 입력(개인 지급 등). 빈 값 제거 후 저장.
+    const validGstNumbers = formData.gstNumbers.filter((gst) => gst.trim() !== '');
     const isLegacyCustomer = selectedPartner?.recordSource === 'customer';
 
-    if (!isLegacyCustomer && validGstNumbers.length === 0) {
-      setNotify({ message: t('partnerManagement.gstMinOneRequired'), severity: 'warning' });
-      return;
-    }
-    
     const formDataWithValidGst = {
       ...formData,
       companyName: normalizePartnerCompanyName(formData.companyName),
-      gstNumbers: validGstNumbers.length > 0 ? validGstNumbers : [''],
+      businessNumber: String(formData.businessNumber || '').trim(),
+      gstNumbers: validGstNumbers,
     };
 
     // Reflect normalized name in the form immediately
     setFormData((prev) => ({ ...prev, companyName: formDataWithValidGst.companyName }));
 
+    if (!formDataWithValidGst.companyName) {
+      setNotify({ message: t('partnerManagement.companyNameRequired'), severity: 'warning' });
+      return;
+    }
+
+    const nameKey = formDataWithValidGst.companyName.toLowerCase();
     const duplicateInList = partners.find((p) => {
       if (p.recordSource === 'room_guest') return false;
       if (selectedPartner && p.id === selectedPartner.id) return false;
@@ -529,10 +597,7 @@ const PartnerManagement: React.FC = () => {
       ) {
         return false;
       }
-      return (
-        normalizePartnerCompanyName(p.companyName).toLowerCase() ===
-        formDataWithValidGst.companyName.toLowerCase()
-      );
+      return normalizePartnerCompanyName(p.companyName).toLowerCase() === nameKey;
     });
     if (duplicateInList) {
       setNotify({
@@ -566,6 +631,16 @@ const PartnerManagement: React.FC = () => {
       setOpenDialog(false);
       loadPartners();
     } catch (error: any) {
+      const code = error.response?.data?.code;
+      if (code === 'DUPLICATE_COMPANY_NAME') {
+        setNotify({
+          message: t('partnerManagement.duplicateCompanyName', {
+            name: formDataWithValidGst.companyName,
+          }),
+          severity: 'warning',
+        });
+        return;
+      }
       const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || t('partnerManagement.saveError');
       setNotify({ message: errorMessage, severity: 'error' });
     }
@@ -586,12 +661,8 @@ const PartnerManagement: React.FC = () => {
   };
 
   const handleRemoveGstNumber = (index: number) => {
-    if (formData.gstNumbers.length <= 1) {
-      setNotify({ message: t('partnerManagement.gstMinOneNeeded'), severity: 'warning' });
-      return;
-    }
-    const newGstNumbers = formData.gstNumbers.filter((_, i) => i !== index);
-    setFormData({ ...formData, gstNumbers: newGstNumbers });
+    const next = formData.gstNumbers.filter((_, i) => i !== index);
+    setFormData({ ...formData, gstNumbers: next.length > 0 ? next : [''] });
   };
 
   const handleDelete = (id: number) => {
@@ -1621,316 +1692,347 @@ const PartnerManagement: React.FC = () => {
           {dialogMode === 'view' ? t('partnerManagement.viewPartner') : dialogMode === 'edit' ? t('partnerManagement.editPartner') : t('partnerManagement.addNewPartner')}
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.companyName')} <span style={{ color: '#d32f2f' }}>*</span>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, mt: 1 }}>
+            <Accordion defaultExpanded sx={getAccordionFormSx(theme)}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography component="h3" sx={partnerFormSectionTitleSx}>
+                  {t('partnerManagement.sectionBasic')}
                 </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.companyName}
-                  onChange={(e) => setFormData({...formData, companyName: e.target.value})}
-                  onBlur={() => {
-                    if (dialogMode === 'view') return;
-                    const normalized = normalizePartnerCompanyName(formData.companyName);
-                    if (normalized !== formData.companyName) {
-                      setFormData((prev) => ({ ...prev, companyName: normalized }));
-                    }
-                  }}
-                  placeholder={t('partnerManagement.placeholderCompanyName')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.businessNumber')} <span style={{ color: '#d32f2f' }}>*</span>
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.businessNumber}
-                  onChange={(e) => setFormData({...formData, businessNumber: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderBusinessNumber')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.panNumber')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.panNumber || ''}
-                  onChange={(e) => setFormData({...formData, panNumber: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderPan')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.gstNumber')} <span style={{ color: '#d32f2f' }}>*</span>
-                  <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
-                    {t('partnerManagement.gstNumberMinMax')}
-                  </Typography>
-                </Typography>
-                {dialogMode !== 'view' && (
-                  <Button
-                    size="small"
-                    startIcon={<AddIcon />}
-                    onClick={handleAddGstNumber}
-                    disabled={formData.gstNumbers.length >= 10}
-                    sx={{ fontSize: '0.75rem', minWidth: 'auto', px: 1.5 }}
-                  >
-                    {t('partnerManagement.add')}
-                  </Button>
-                )}
-              </Box>
-              {formData.gstNumbers.map((gstNumber, index) => (
-                <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                  <TextField
-                    fullWidth
-                    value={gstNumber}
-                    onChange={(e) => handleGstNumberChange(index, e.target.value)}
-                    placeholder={t('partnerManagement.placeholderGst', { index: index + 1 })}
-                    required={dialogMode !== 'view'}
-                    error={
-                      dialogMode !== 'view' &&
-                      gstNumber.trim() === '' &&
-                      formData.gstNumbers.filter((g) => g.trim() !== '').length === 0
-                    }
-                    helperText={
-                      dialogMode !== 'view' &&
-                      gstNumber.trim() === '' &&
-                      formData.gstNumbers.filter((g) => g.trim() !== '').length === 0
-                        ? t('partnerManagement.placeholderGstRequired')
-                        : ''
-                    }
-                    disabled={dialogMode === 'view'}
-                  />
-                  {dialogMode !== 'view' && (
-                    <IconButton
-                      onClick={() => handleRemoveGstNumber(index)}
-                      disabled={formData.gstNumbers.length <= 1}
-                      color="error"
-                      sx={{ mt: 0.5 }}
-                    >
-                      <RemoveIcon />
-                    </IconButton>
-                  )}
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={partnerFormGridSx}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.companyName')} <span style={{ color: '#d32f2f' }}>*</span>
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.companyName}
+                      onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                      onBlur={() => {
+                        if (dialogMode === 'view') return;
+                        const normalized = normalizePartnerCompanyName(formData.companyName);
+                        if (normalized !== formData.companyName) {
+                          setFormData((prev) => ({ ...prev, companyName: normalized }));
+                        }
+                        if (!normalized) return;
+                        const nameKey = normalized.toLowerCase();
+                        const dup = partners.find((p) => {
+                          if (p.recordSource === 'room_guest') return false;
+                          if (selectedPartner && p.id === selectedPartner.id) return false;
+                          return normalizePartnerCompanyName(p.companyName).toLowerCase() === nameKey;
+                        });
+                        if (dup) {
+                          setNotify({
+                            message: t('partnerManagement.duplicateCompanyName', { name: normalized }),
+                            severity: 'warning',
+                          });
+                        }
+                      }}
+                      placeholder={t('partnerManagement.placeholderCompanyName')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.businessNumber')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.businessNumber}
+                      onChange={(e) => setFormData({ ...formData, businessNumber: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderBusinessNumber')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.panNumber')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.panNumber || ''}
+                      onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderPan')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.representativeName')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.representative}
+                      onChange={(e) => setFormData({ ...formData, representative: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderRepresentative')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.companyType')}
+                    </Typography>
+                    <FormControl fullWidth>
+                      <Select
+                        value={formData.businessType}
+                        onChange={(e) => setFormData({ ...formData, businessType: e.target.value as any })}
+                        displayEmpty
+                        disabled={dialogMode === 'view'}
+                      >
+                        <MenuItem value="partner">{t('partnerManagement.typePartner')}</MenuItem>
+                        <MenuItem value="customer">{t('partnerManagement.typeCustomer')}</MenuItem>
+                        <MenuItem value="customer_partner">{t('partnerManagement.typeCustomerPartner')}</MenuItem>
+                        <MenuItem value="other">{t('partnerManagement.typeOther')}</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.industry')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.industry}
+                      onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderIndustry')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, gridColumn: { sm: '1 / -1' } }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.website')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.website}
+                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderWebsite')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, gridColumn: { sm: '1 / -1' } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                        {t('partnerManagement.gstNumber')}
+                        <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                          {t('partnerManagement.gstNumberMinMax')}
+                        </Typography>
+                      </Typography>
+                      {dialogMode !== 'view' && (
+                        <Button
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={handleAddGstNumber}
+                          disabled={formData.gstNumbers.length >= 10}
+                          sx={{ fontSize: '0.75rem', minWidth: 'auto', px: 1.5 }}
+                        >
+                          {t('partnerManagement.add')}
+                        </Button>
+                      )}
+                    </Box>
+                    {formData.gstNumbers.map((gstNumber, index) => (
+                      <Box key={index} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <TextField
+                          fullWidth
+                          value={gstNumber}
+                          onChange={(e) => handleGstNumberChange(index, e.target.value)}
+                          placeholder={t('partnerManagement.placeholderGst', { index: index + 1 })}
+                          disabled={dialogMode === 'view'}
+                        />
+                        {dialogMode !== 'view' && (
+                          <IconButton
+                            onClick={() => handleRemoveGstNumber(index)}
+                            disabled={formData.gstNumbers.length <= 1 && !String(formData.gstNumbers[0] || '').trim()}
+                            color="error"
+                            sx={{ mt: 0.5 }}
+                          >
+                            <RemoveIcon />
+                          </IconButton>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
                 </Box>
-              ))}
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.representativeName')}
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion sx={getAccordionFormSx(theme)}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography component="h3" sx={partnerFormSectionTitleSx}>
+                  {t('partnerManagement.sectionContact')}
                 </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.representative}
-                  onChange={(e) => setFormData({...formData, representative: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderRepresentative')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.companyType')}
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={partnerFormGridSx}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, gridColumn: { sm: '1 / -1' } }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.address')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderAddress')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.phone')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderPhone')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.email')} <span style={{ color: '#d32f2f' }}>*</span>
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderEmail')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion sx={getAccordionFormSx(theme)}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography component="h3" sx={partnerFormSectionTitleSx}>
+                  {t('partnerManagement.sectionBank')}
                 </Typography>
-                <FormControl fullWidth>
-                  <Select
-                    value={formData.businessType}
-                    onChange={(e) => setFormData({...formData, businessType: e.target.value as any})}
-                    displayEmpty
-                    disabled={dialogMode === 'view'}
-                  >
-                    <MenuItem value="partner">{t('partnerManagement.typePartner')}</MenuItem>
-                    <MenuItem value="customer">{t('partnerManagement.typeCustomer')}</MenuItem>
-                    <MenuItem value="customer_partner">{t('partnerManagement.typeCustomerPartner')}</MenuItem>
-                    <MenuItem value="other">{t('partnerManagement.typeOther')}</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.industry')}
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={partnerFormGridSx}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.bankName')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.bankName}
+                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderBankName')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.accountNumber')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.accountNumber}
+                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderAccountNumber')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.ifsc')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.ifsc}
+                      onChange={(e) => setFormData({ ...formData, ifsc: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderIfsc')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.accountHolder')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      value={formData.accountHolder}
+                      onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderAccountHolder')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+
+            <Accordion defaultExpanded sx={getAccordionFormSx(theme)}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography component="h3" sx={partnerFormSectionTitleSx}>
+                  {t('partnerManagement.sectionContract')}
                 </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.industry}
-                  onChange={(e) => setFormData({...formData, industry: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderIndustry')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.website')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.website}
-                  onChange={(e) => setFormData({...formData, website: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderWebsite')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                {t('partnerManagement.address')}
-              </Typography>
-              <TextField
-                fullWidth
-                value={formData.address}
-                onChange={(e) => setFormData({...formData, address: e.target.value})}
-                placeholder={t('partnerManagement.placeholderAddress')}
-                disabled={dialogMode === 'view'}
-              />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.phone')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderPhone')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.email')} <span style={{ color: '#d32f2f' }}>*</span>
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderEmail')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.bankName')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.bankName}
-                  onChange={(e) => setFormData({...formData, bankName: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderBankName')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.accountNumber')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.accountNumber}
-                  onChange={(e) => setFormData({...formData, accountNumber: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderAccountNumber')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.ifsc')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.ifsc}
-                  onChange={(e) => setFormData({...formData, ifsc: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderIfsc')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.accountHolder')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.accountHolder}
-                  onChange={(e) => setFormData({...formData, accountHolder: e.target.value})}
-                  placeholder={t('partnerManagement.placeholderAccountHolder')}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.contractStartDate')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  type="date"
-                  value={formData.contractStartDate}
-                  onChange={(e) => setFormData({...formData, contractStartDate: e.target.value})}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                  {t('partnerManagement.contractEndDate')}
-                </Typography>
-                <TextField
-                  fullWidth
-                  type="date"
-                  value={formData.contractEndDate}
-                  onChange={(e) => setFormData({...formData, contractEndDate: e.target.value})}
-                  InputLabelProps={{ shrink: true }}
-                  disabled={dialogMode === 'view'}
-                />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                {t('partnerManagement.status')}
-              </Typography>
-              <FormControl fullWidth>
-                <Select
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value as any})}
-                  displayEmpty
-                  disabled={dialogMode === 'view'}
-                >
-                  <MenuItem value="active">{t('partnerManagement.active')}</MenuItem>
-                  <MenuItem value="inactive">{t('partnerManagement.inactive')}</MenuItem>
-                  <MenuItem value="suspended">{t('partnerManagement.suspended')}</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500, color: 'text.primary' }}>
-                {t('partnerManagement.notes')}
-              </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                placeholder={t('partnerManagement.placeholderNotes')}
-                disabled={dialogMode === 'view'}
-              />
-            </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={partnerFormGridSx}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.contractStartDate')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      value={formData.contractStartDate}
+                      onChange={(e) => setFormData({ ...formData, contractStartDate: e.target.value })}
+                      InputLabelProps={{ shrink: true }}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.contractEndDate')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      value={formData.contractEndDate}
+                      onChange={(e) => setFormData({ ...formData, contractEndDate: e.target.value })}
+                      InputLabelProps={{ shrink: true }}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.status')}
+                    </Typography>
+                    <FormControl fullWidth>
+                      <Select
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                        displayEmpty
+                        disabled={dialogMode === 'view'}
+                      >
+                        <MenuItem value="active">{t('partnerManagement.active')}</MenuItem>
+                        <MenuItem value="inactive">{t('partnerManagement.inactive')}</MenuItem>
+                        <MenuItem value="suspended">{t('partnerManagement.suspended')}</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, gridColumn: { sm: '1 / -1' } }}>
+                    <Typography variant="body2" sx={partnerFormFieldLabelSx}>
+                      {t('partnerManagement.notes')}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder={t('partnerManagement.placeholderNotes')}
+                      disabled={dialogMode === 'view'}
+                    />
+                  </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
           </Box>
         </DialogContent>
         <DialogActions>

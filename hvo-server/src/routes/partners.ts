@@ -52,7 +52,7 @@ const serializePartners = (partners: any[]) => {
   return Array.from(byId.values());
 };
 
-/** 동일 회사(tenant+company) 내 회사명 중복 — 정규화 후 대소문자 무시 */
+/** 동일 회사(tenant+company) 내 회사명 중복 — Pvt Ltd 정규화 포함, 대소문자 무시 */
 const findDuplicatePartnerByCompanyName = async ({
   tenantId,
   companyId,
@@ -66,21 +66,25 @@ const findDuplicatePartnerByCompanyName = async ({
 }) => {
   const normalized = normalizePartnerCompanyName(companyName);
   if (!normalized) return null;
+  const key = normalized.toLowerCase();
   const where: Record<string, unknown> = {
     tenant_id: tenantId,
     company_id: companyId,
-    [Op.and]: sequelize.where(
-      sequelize.fn('lower', sequelize.col('company_name')),
-      normalized.toLowerCase()
-    ),
   };
   if (excludeId != null && Number.isFinite(excludeId) && excludeId > 0) {
     where.id = { [Op.ne]: excludeId };
   }
-  return (Partner as any).findOne({
+  // DB에 저장된 표기(Pvt Ltd 등)가 달라도 정규화 후 동일하면 중복으로 본다
+  const candidates = await (Partner as any).findAll({
     where,
     attributes: ['id', 'company_name', 'business_number', 'email', 'status'],
   });
+  return (
+    candidates.find(
+      (row: { company_name?: string }) =>
+        normalizePartnerCompanyName(row.company_name).toLowerCase() === key
+    ) || null
+  );
 };
 
 // Multer 설정 (메모리 스토리지)
@@ -204,7 +208,7 @@ router.post(
   authenticateToken,
   validateBody({
     companyName: { required: true, type: 'string', minLength: 1, maxLength: 200 },
-    businessNumber: { required: true, type: 'string', minLength: 4, maxLength: 50 },
+    businessNumber: { type: 'string', maxLength: 50 },
     email: { required: true, type: 'string', maxLength: 255, pattern: emailPattern },
     status: { type: 'string', maxLength: 50 },
     phone: { type: 'string', maxLength: 50 },
@@ -220,15 +224,9 @@ router.post(
     const companyId = (req as any).user.company_id;
     const { gstNumbers, ...partnerFormData } = req.body;
 
-    // GST 번호 검증
-    if (!gstNumbers || !Array.isArray(gstNumbers) || gstNumbers.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'GST 번호를 최소 1개 이상 입력해주세요.'
-      });
-    }
-
-    if (gstNumbers.length > 10) {
+    // GST 번호: 선택 입력. 최대 10개만 검증.
+    const rawGstNumbers = Array.isArray(gstNumbers) ? gstNumbers : [];
+    if (rawGstNumbers.length > 10) {
       return res.status(400).json({
         success: false,
         message: 'GST 번호는 최대 10개까지 등록할 수 있습니다.'
@@ -237,6 +235,8 @@ router.post(
 
     // 파트너 생성
     const normalizedCompanyName = normalizePartnerCompanyName(partnerFormData.companyName);
+    const businessNumber =
+      String(partnerFormData.businessNumber || '').trim() || '-';
     const duplicateByName = await findDuplicatePartnerByCompanyName({
       tenantId,
       companyId,
@@ -261,7 +261,7 @@ router.post(
       tenant_id: tenantId,
       company_id: companyId,
       company_name: normalizedCompanyName,
-      business_number: partnerFormData.businessNumber,
+      business_number: businessNumber,
       pan_number: partnerFormData.panNumber || null,
       representative: partnerFormData.representative || null,
       business_type: partnerFormData.businessType || 'partner',
@@ -280,8 +280,8 @@ router.post(
       notes: partnerFormData.notes || null
     });
 
-    // GST 번호 저장
-    const validGstNumbers = gstNumbers.filter((gst: string) => gst && gst.trim() !== '');
+    // GST 번호 저장 (있을 때만)
+    const validGstNumbers = rawGstNumbers.filter((gst: string) => gst && gst.trim() !== '');
     for (const gstNumber of validGstNumbers) {
       await (PartnerGstNumber as any).create({
         partner_id: partner.id,
@@ -335,7 +335,7 @@ router.put(
   authenticateToken,
   validateBody({
     companyName: { type: 'string', minLength: 1, maxLength: 200 },
-    businessNumber: { type: 'string', minLength: 4, maxLength: 50 },
+    businessNumber: { type: 'string', maxLength: 50 },
     email: { type: 'string', maxLength: 255, pattern: emailPattern },
     status: { type: 'string', maxLength: 50 },
     phone: { type: 'string', maxLength: 50 },
@@ -367,12 +367,12 @@ router.put(
       });
     }
 
-    // GST 번호 검증
+    // GST 번호: 선택 입력. 최대 10개만 검증.
     if (gstNumbers !== undefined) {
-      if (!Array.isArray(gstNumbers) || gstNumbers.length === 0) {
+      if (!Array.isArray(gstNumbers)) {
         return res.status(400).json({
           success: false,
-          message: 'GST 번호를 최소 1개 이상 입력해주세요.'
+          message: 'GST 번호 형식이 올바르지 않습니다.'
         });
       }
 
@@ -388,36 +388,33 @@ router.put(
           .filter((gst: string) => gst && gst.trim() !== '')
           .map((gst: string) => gst.trim().toUpperCase())
       )];
-      if (validGstNumbers.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'GST 번호를 최소 1개 이상 입력해주세요.'
-        });
-      }
 
       await sequelize.transaction(async (transaction) => {
         const existingNumbers = await (PartnerGstNumber as any).findAll({
-          where: { partner_id: id },
+          where: { partner_id: partner.id },
           transaction,
         });
-        const existingByNumber = new Map<string, any>(
-          existingNumbers.map((record: any) => [String(record.gst_number).trim().toUpperCase(), record])
-        );
-
-        await (PartnerGstNumber as any).update(
-          { is_active: false },
-          { where: { partner_id: id, is_active: true }, transaction }
-        );
+        // soft-deactivate all then restore/create matching — keep soft-delete rule
+        for (const row of existingNumbers) {
+          if (row.is_active !== false) {
+            await row.update({ is_active: false }, { transaction });
+          }
+        }
         for (const gstNumber of validGstNumbers) {
-          const existing = existingByNumber.get(gstNumber);
-          if (existing) {
-            await existing.update({ is_active: true }, { transaction });
+          const found = existingNumbers.find(
+            (r: any) => String(r.gst_number || '').trim().toUpperCase() === gstNumber
+          );
+          if (found) {
+            await found.update({ is_active: true }, { transaction });
           } else {
-            await (PartnerGstNumber as any).create({
-              partner_id: id,
-              gst_number: gstNumber,
-              is_active: true,
-            }, { transaction });
+            await (PartnerGstNumber as any).create(
+              {
+                partner_id: partner.id,
+                gst_number: gstNumber,
+                is_active: true,
+              },
+              { transaction }
+            );
           }
         }
       });
@@ -449,9 +446,14 @@ router.put(
       }
     }
 
+    const nextBusinessNumber =
+      partnerData.businessNumber !== undefined
+        ? String(partnerData.businessNumber || '').trim() || '-'
+        : partner.business_number;
+
     await partner.update({
       company_name: nextCompanyName,
-      business_number: partnerData.businessNumber || partner.business_number,
+      business_number: nextBusinessNumber,
       pan_number: partnerData.panNumber !== undefined ? partnerData.panNumber : partner.pan_number,
       representative: partnerData.representative !== undefined ? partnerData.representative : partner.representative,
       business_type: partnerData.businessType || partner.business_type,
@@ -773,28 +775,28 @@ router.post('/excel/import', authenticateToken, upload.single('file'), async (re
     for (let i = 0; i < data.length; i++) {
       const row = data[i] as any;
       try {
-        // 필수 필드 검증
-        if (!row['회사명'] || !row['사업자번호'] || !row['이메일']) {
+        // 필수 필드 검증 (CIN/GST는 선택)
+        if (!row['회사명'] || !row['이메일']) {
           results.failed.push({
             row: i + 2, // Excel 행 번호 (헤더 제외)
             data: row,
-            error: '필수 필드(회사명, 사업자번호, 이메일)가 누락되었습니다.'
+            error: '필수 필드(회사명, 이메일)가 누락되었습니다.'
           });
           continue;
         }
 
-        // GST 번호 파싱 (쉼표로 구분)
+        // GST 번호 파싱 (쉼표로 구분) — 선택
         const gstNumbersStr = row['GST 번호 (쉼표로 구분)'] || '';
         const gstNumbers = gstNumbersStr
           .split(',')
           .map((gst: string) => gst.trim())
           .filter((gst: string) => gst !== '');
 
-        if (gstNumbers.length === 0) {
+        if (gstNumbers.length > 10) {
           results.failed.push({
             row: i + 2,
             data: row,
-            error: 'GST 번호를 최소 1개 이상 입력해주세요.'
+            error: 'GST 번호는 최대 10개까지 등록할 수 있습니다.'
           });
           continue;
         }
@@ -808,9 +810,9 @@ router.post('/excel/import', authenticateToken, upload.single('file'), async (re
           continue;
         }
 
-        // 중복 사업자번호 확인
-        const businessNumber = row['사업자번호'].toString().trim();
-        if (seenBusinessNumbers.has(businessNumber.toLowerCase())) {
+        // CIN/사업자번호는 선택 — 비어 있으면 '-'
+        const businessNumber = String(row['사업자번호'] || '').trim() || '-';
+        if (businessNumber !== '-' && seenBusinessNumbers.has(businessNumber.toLowerCase())) {
           results.failed.push({
             row: i + 2,
             data: row,
@@ -819,13 +821,16 @@ router.post('/excel/import', authenticateToken, upload.single('file'), async (re
           continue;
         }
 
-        const existingPartner = await (Partner as any).findOne({
-          where: {
-            tenant_id: tenantId,
-            company_id: companyId,
-            business_number: businessNumber
-          }
-        });
+        const existingPartner =
+          businessNumber === '-'
+            ? null
+            : await (Partner as any).findOne({
+                where: {
+                  tenant_id: tenantId,
+                  company_id: companyId,
+                  business_number: businessNumber
+                }
+              });
 
         if (existingPartner) {
           results.failed.push({
@@ -905,7 +910,9 @@ router.post('/excel/import', authenticateToken, upload.single('file'), async (re
           businessNumber: row['사업자번호']
         });
         seenCompanyNames.add(companyNameKey);
-        seenBusinessNumbers.add(businessNumber.toLowerCase());
+        if (businessNumber !== '-') {
+          seenBusinessNumbers.add(businessNumber.toLowerCase());
+        }
       } catch (error: any) {
         results.failed.push({
           row: i + 2,

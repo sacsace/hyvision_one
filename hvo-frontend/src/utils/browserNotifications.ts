@@ -48,8 +48,8 @@ export function showBrowserDesktopNotification(payload: BrowserNotificationPaylo
     const n = new Notification(title, {
       body: body || undefined,
       tag,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
     });
     n.onclick = () => {
       try {
