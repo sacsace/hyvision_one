@@ -75,6 +75,12 @@ import {
 import { useReferenceDataStore } from '../../store/referenceDataStore';
 import AuthMedia from '../../components/Common/AuthMedia';
 import { generateRoomBookingId } from '../../utils/bookingId';
+import {
+  buildDocumentDownloadFilename,
+  DOCUMENT_PDF_FONT_SIZE_PT,
+  DOCUMENT_PDF_LINE_HEIGHT_PT,
+  DOCUMENT_PDF_MARGINS_MM,
+} from '../../utils/pdf';
 
 const ROOM_BOOKING_MENU_ROUTES = [
   '/hotel/room-reservation',
@@ -141,6 +147,49 @@ interface StoredInvoiceTaxRate {
   cgstRate: number;
   sgstRate: number;
 }
+
+/** 56th GST Council — 호텔 숙박(1박당 실제 공급가액) 신규 세율 적용일 */
+const HOTEL_ACCOMMODATION_GST_NEW_FROM = '2025-09-22';
+const HOTEL_ACCOMMODATION_GST_THRESHOLD_INR = 7500;
+
+const toYmdLocal = (value?: string | Date | null): string => {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const parsed = new Date(s);
+    if (Number.isNaN(parsed.getTime())) return '';
+    value = parsed;
+  }
+  const d = value as Date;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+/**
+ * 숙박 요금(1실·1박, INR)에 따른 CGST/SGST 각각의 세율(%).
+ * - 2025-09-22 이후: ≤₹7,500 → 2.5+2.5(5%), >₹7,500 → 9+9(18%) — 전액 단일 세율
+ * - 이전: ≤₹2,500 → 2.5, ≤₹7,500 → 6, 초과 → 9
+ */
+const getHotelAccommodationGstSplitRate = (
+  nightlyRateInr?: number,
+  supplyDate?: string | Date | null
+): number => {
+  const rate = Number(nightlyRateInr);
+  if (!Number.isFinite(rate) || rate < 0) return 2.5;
+
+  const ymd = toYmdLocal(supplyDate) || toYmdLocal(new Date());
+  const useNewRule = ymd >= HOTEL_ACCOMMODATION_GST_NEW_FROM;
+
+  if (useNewRule) {
+    return rate <= HOTEL_ACCOMMODATION_GST_THRESHOLD_INR ? 2.5 : 9;
+  }
+  if (rate <= 2500) return 2.5;
+  if (rate <= HOTEL_ACCOMMODATION_GST_THRESHOLD_INR) return 6;
+  return 9;
+};
 
 interface RoomBookingManagementProps {
   dialogOnly?: boolean;
@@ -373,12 +422,16 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
       });
     }
   };
-  const getAutoGstRate = (nightlyRate?: number) => {
-    if (!nightlyRate || !Number.isFinite(nightlyRate)) return 2.5;
-    if (nightlyRate <= 2500) return 2.5;
-    if (nightlyRate <= 7500) return 6;
-    return 9;
+  const getAutoGstRate = (nightlyRate?: number, supplyDate?: string | Date | null) =>
+    getHotelAccommodationGstSplitRate(nightlyRate, supplyDate);
+
+  const applyAutoGstFromNightly = (nightlyRate?: number, supplyDate?: string | Date | null) => {
+    const autoRate = getAutoGstRate(nightlyRate, supplyDate);
+    setCgstRate(autoRate);
+    setSgstRate(autoRate);
+    return autoRate;
   };
+
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -515,7 +568,16 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
 
   const persistInvoiceTaxRate = (bookingId: number, next: StoredInvoiceTaxRate) => {
     setInvoiceTaxSnapshot((prev) => {
-      const snapshot = { ...prev, [String(bookingId)]: next };
+      const key = String(bookingId);
+      const prevRate = prev[key];
+      if (
+        prevRate &&
+        Number(prevRate.cgstRate) === Number(next.cgstRate) &&
+        Number(prevRate.sgstRate) === Number(next.sgstRate)
+      ) {
+        return prev;
+      }
+      const snapshot = { ...prev, [key]: next };
       userUiPreferencesService.patch({ roomInvoiceTaxSnapshot: snapshot }).catch(() => {});
       return snapshot;
     });
@@ -556,16 +618,12 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
     setInvoiceUnitPrice(
       Number.isFinite(Number(nightly)) ? String(Number(nightly.toFixed(2))) : ''
     );
-    const autoRate = getAutoGstRate(nightly);
-    const storedRate = invoiceTaxSnapshot[String(selectedBooking.id)];
-    if (storedRate && Number.isFinite(storedRate.cgstRate) && Number.isFinite(storedRate.sgstRate)) {
-      setCgstRate(Number(storedRate.cgstRate));
-      setSgstRate(Number(storedRate.sgstRate));
-      return;
-    }
+    const supplyDate = selectedBooking.checkInDate || selectedBooking.checkOutDate;
+    const autoRate = getAutoGstRate(nightly, supplyDate);
     setCgstRate(autoRate);
     setSgstRate(autoRate);
-  }, [selectedBooking, invoiceTaxSnapshot]);
+    persistInvoiceTaxRate(selectedBooking.id, { cgstRate: autoRate, sgstRate: autoRate });
+  }, [selectedBooking]);
 
   useEffect(() => {
     const loadIssuerCompany = async () => {
@@ -2023,9 +2081,9 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
           clonedDoc.body.classList.add('pdf-export');
           const style = clonedDoc.createElement('style');
           style.textContent = `
-            body { margin: 0; padding: 0; font-size: 8pt; }
-            .tax-invoice-print { width: 180mm; margin: 0; padding: 0; box-sizing: border-box; font-size: 8pt; }
-            .tax-invoice-print * { font-size: 8pt; }
+            body { margin: 0; padding: 0; font-size: ${DOCUMENT_PDF_FONT_SIZE_PT}pt; line-height: ${DOCUMENT_PDF_LINE_HEIGHT_PT}pt; }
+            .tax-invoice-print { width: 180mm; margin: 0; padding: 0; box-sizing: border-box; font-size: ${DOCUMENT_PDF_FONT_SIZE_PT}pt; line-height: ${DOCUMENT_PDF_LINE_HEIGHT_PT}pt; }
+            .tax-invoice-print * { font-size: ${DOCUMENT_PDF_FONT_SIZE_PT}pt; line-height: ${DOCUMENT_PDF_LINE_HEIGHT_PT}pt; }
           `;
           clonedDoc.head.appendChild(style);
         }
@@ -2037,10 +2095,10 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = 210;
     const pageHeight = 297;
-    const marginTop = options?.marginTop ?? 5;
-    const marginRight = options?.marginRight ?? 5;
-    const marginBottom = options?.marginBottom ?? 5;
-    const marginLeft = options?.marginLeft ?? 5;
+    const marginTop = options?.marginTop ?? DOCUMENT_PDF_MARGINS_MM.top;
+    const marginRight = options?.marginRight ?? DOCUMENT_PDF_MARGINS_MM.right;
+    const marginBottom = options?.marginBottom ?? DOCUMENT_PDF_MARGINS_MM.bottom;
+    const marginLeft = options?.marginLeft ?? DOCUMENT_PDF_MARGINS_MM.left;
     const imgWidth = pageWidth - marginLeft - marginRight;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     const printableHeight = pageHeight - marginTop - marginBottom;
@@ -2056,27 +2114,23 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
       heightLeft -= printableHeight;
     }
 
-    const buildDateToken = (value?: string): string => {
-      const date = value ? new Date(value) : new Date();
-      const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
-      const y = safeDate.getFullYear();
-      const m = String(safeDate.getMonth() + 1).padStart(2, '0');
-      const d = String(safeDate.getDate()).padStart(2, '0');
-      return `${y}${m}${d}`;
-    };
-    const sanitizeFilePart = (value: string) =>
-      value.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim();
-    const recipientLabel = sanitizeFilePart(billTo.company || billTo.name || 'Recipient');
-    const descriptionLabel = sanitizeFilePart(invoiceDescription || 'Accommodation charge');
-    const dateToken = buildDateToken(selectedBooking?.checkInDate);
-    const filename = `${dateToken}_Invoice (${recipientLabel}) (${descriptionLabel}).pdf`;
+    const recipientLabel = billTo.company || billTo.name || 'Recipient';
+    const descriptionLabel = invoiceDescription || 'Accommodation charge';
+    const filename = buildDocumentDownloadFilename({
+      code: 'Invoice',
+      companyName: recipientLabel,
+      detail: descriptionLabel,
+      date: selectedBooking?.checkInDate,
+    });
     return { pdf, filename };
   };
 
   const handleDownloadPdf = async () => {
     const result = await buildInvoicePdf({
-      marginLeft: 20,
-      marginRight: 10
+      marginTop: DOCUMENT_PDF_MARGINS_MM.top,
+      marginRight: DOCUMENT_PDF_MARGINS_MM.right,
+      marginBottom: DOCUMENT_PDF_MARGINS_MM.bottom,
+      marginLeft: DOCUMENT_PDF_MARGINS_MM.left,
     });
     if (!result) return;
     const { pdf, filename } = result;
@@ -2370,9 +2424,18 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
                     <TableCell align="right" sx={invoiceCellSx}>
                       <InputBase
                         value={formatCurrency(invoiceUnitPrice)}
-                        onChange={(event) =>
-                          setInvoiceUnitPrice(parseCurrencyInput(event.target.value))
-                        }
+                        onChange={(event) => {
+                          const next = parseCurrencyInput(event.target.value);
+                          setInvoiceUnitPrice(next);
+                          const nightly = Number(next);
+                          const supplyDate =
+                            selectedBooking.checkInDate || selectedBooking.checkOutDate;
+                          const autoRate = applyAutoGstFromNightly(nightly, supplyDate);
+                          persistInvoiceTaxRate(selectedBooking.id, {
+                            cgstRate: autoRate,
+                            sgstRate: autoRate,
+                          });
+                        }}
                         inputProps={{
                           inputMode: 'numeric',
                           'aria-label': 'Unit Price'
@@ -2466,6 +2529,15 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
                     Rs. {formatCurrency(sgstAmount.toFixed(2))}
                   </Typography>
                 </Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mb: 0.75, lineHeight: 1.35 }}
+                >
+                  {effectiveUnitPrice <= HOTEL_ACCOMMODATION_GST_THRESHOLD_INR
+                    ? 'Accommodation GST 5% (≤ ₹7,500 / night)'
+                    : 'Accommodation GST 18% (> ₹7,500 / night)'}
+                </Typography>
                 <Divider sx={{ my: 1, borderColor: '#CBD5E1' }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="subtitle2" fontWeight={700}>
@@ -2600,7 +2672,7 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
           {`
             @page {
               size: A4;
-              margin: 10mm;
+              margin: 10mm 10mm 10mm 20mm;
             }
             @media print {
               html,
@@ -2634,7 +2706,7 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
                 position: fixed !important;
                 inset: 0 !important;
                 margin: 0 !important;
-                padding: 10mm !important;
+                padding: 10mm 10mm 10mm 20mm !important;
                 border-radius: 0 !important;
                 min-height: auto !important;
                 width: 100% !important;
@@ -2672,13 +2744,14 @@ const RoomBookingManagement: React.FC<RoomBookingManagementProps> = ({
               padding: 5mm;
               box-sizing: border-box;
               background: #fff;
-              font-size: 8pt;
-              line-height: 1.25;
+              font-size: ${DOCUMENT_PDF_FONT_SIZE_PT}pt;
+              line-height: ${DOCUMENT_PDF_LINE_HEIGHT_PT}pt;
             }
             body.pdf-export .tax-invoice-print table,
             body.pdf-export .tax-invoice-print th,
             body.pdf-export .tax-invoice-print td {
-              font-size: 8pt;
+              font-size: ${DOCUMENT_PDF_FONT_SIZE_PT}pt;
+              line-height: ${DOCUMENT_PDF_LINE_HEIGHT_PT}pt;
             }
           `}
         </style>

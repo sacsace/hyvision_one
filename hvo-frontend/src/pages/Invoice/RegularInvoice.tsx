@@ -72,6 +72,12 @@ import { useStore } from '../../store';
 import { accountingService, partnerService, companyService } from '../../services/api';
 import { useReferenceDataStore } from '../../store/referenceDataStore';
 import AuthMedia from '../../components/Common/AuthMedia';
+import {
+  buildDocumentDownloadFilename,
+  DOCUMENT_PDF_FONT_SIZE_PT,
+  DOCUMENT_PDF_LINE_HEIGHT_PT,
+  DOCUMENT_PDF_MARGINS_MM,
+} from '../../utils/pdf';
 
 interface InvoiceItem {
   id?: number;
@@ -107,12 +113,11 @@ interface Invoice {
   created_by?: number | null;
 }
 
-/** 일반 세금계산서 메일 제목용 회사 약자 — 예: Hyvision India → HVO */
+/** 일반 세금계산서 메일 제목용 회사 약자 — 예: Minsub Ventures → MSV */
 function buildInvoiceEmailCompanyAbbr(companyName: string): string {
   const n = (companyName || '').trim();
   const lower = n.toLowerCase();
-  if (lower.includes('hyvision')) return 'HVO';
-  if (lower.includes('minsub') && lower.includes('venture')) return 'HVO';
+  if (lower.includes('minsub') && lower.includes('venture')) return 'MSV';
   const cleaned = n.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (!cleaned) return 'CMP';
   return cleaned.slice(0, 3).padEnd(3, 'X');
@@ -172,7 +177,7 @@ Kind regards,
 ${params.issuerLegalName || 'Accounts'}
 
 ---
-This message was sent automatically from the Hyvision One system.`;
+This message was sent automatically from the MSV system.`;
   return { subject, message };
 }
 
@@ -197,10 +202,9 @@ interface CompanyInfo {
   ifsc_code?: string;
 }
 
-const EXCEL_BASE_FONT_SIZE = '9pt';
-const EXCEL_BASE_LINE_HEIGHT = '20px';
-/** 합계·GST 요약 블록 — 기본 대비 약간 축소, 가독성 유지 */
-const TAX_SUMMARY_LINE_HEIGHT = '18px';
+const EXCEL_BASE_FONT_SIZE = `${DOCUMENT_PDF_FONT_SIZE_PT}pt`;
+const EXCEL_BASE_LINE_HEIGHT = `${DOCUMENT_PDF_LINE_HEIGHT_PT}pt`;
+const TAX_SUMMARY_LINE_HEIGHT = `${DOCUMENT_PDF_LINE_HEIGHT_PT}pt`;
 const TAX_SUMMARY_CELL_PADDING = '5px 8px';
 
 const taxSummaryTableSx = {
@@ -801,11 +805,10 @@ const RegularInvoice: React.FC = () => {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
-    // 요구사항: 좌측 2cm, 우측 1cm 여백
-    const marginLeft = 20;
-    const marginTop = 6;
-    const marginRight = 10;
-    const marginBottom = 6;
+    const marginLeft = DOCUMENT_PDF_MARGINS_MM.left;
+    const marginTop = DOCUMENT_PDF_MARGINS_MM.top;
+    const marginRight = DOCUMENT_PDF_MARGINS_MM.right;
+    const marginBottom = DOCUMENT_PDF_MARGINS_MM.bottom;
     const contentWidth = pdfWidth - marginLeft - marginRight;
     const contentHeight = pdfHeight - marginTop - marginBottom;
     /** PNG 무손실 + scale 2 는 A4 한 장이 수~십 MB로 불어남 → 메일 5MB 한도 초과. JPEG·적정 해상도로 압축 */
@@ -824,8 +827,8 @@ const RegularInvoice: React.FC = () => {
             box-sizing: border-box !important;
           }
           .invoice-page * {
-            font-size: ${EXCEL_BASE_FONT_SIZE};
-            line-height: ${EXCEL_BASE_LINE_HEIGHT};
+            font-size: ${EXCEL_BASE_FONT_SIZE} !important;
+            line-height: ${EXCEL_BASE_LINE_HEIGHT} !important;
           }
             .invoice-page .tax-summary-label {
               white-space: nowrap !important;
@@ -903,7 +906,23 @@ const RegularInvoice: React.FC = () => {
     }
     try {
       const pdf = await generateInvoicePdf();
-      pdf.save(`${selectedInvoice.invoice_number}.pdf`);
+      const company =
+        selectedInvoice.customer_name ||
+        viewCustomer?.name ||
+        issuerCompany?.name ||
+        'Customer';
+      const detail =
+        selectedInvoice.invoice_number ||
+        buildInvoiceLineSummaryForEmail(selectedInvoice.items || [], 1) ||
+        'Invoice';
+      pdf.save(
+        buildDocumentDownloadFilename({
+          code: 'Invoice',
+          companyName: company,
+          detail,
+          date: selectedInvoice.invoice_date,
+        })
+      );
     } catch (error) {
       showSnackbar(tr('PDF 다운로드에 실패했습니다.', 'Failed to download PDF.'), 'error');
     }
@@ -936,11 +955,24 @@ const RegularInvoice: React.FC = () => {
         currency: selectedInvoice.currency || 'INR',
         summary
       });
+      const company =
+        (selectedInvoice.customer_name || viewCustomer.name || issuerCompany?.name || '').trim() ||
+        'Customer';
+      const detail =
+        selectedInvoice.invoice_number ||
+        buildInvoiceLineSummaryForEmail(selectedInvoice.items || [], 1) ||
+        'Invoice';
+      const attachmentFilename = buildDocumentDownloadFilename({
+        code: 'Invoice',
+        companyName: company,
+        detail,
+        date: selectedInvoice.invoice_date,
+      });
       const res = await accountingService.sendInvoiceEmail(selectedInvoice.id, {
         to: toEmail,
         subject: emailSubject,
         message: emailBody,
-        filename: `${selectedInvoice.invoice_number.replace(/[^\w.-]+/g, '_')}.pdf`
+        filename: attachmentFilename,
       });
       if (res?.success === false && res?.message) {
         showSnackbar(res.message, 'error');
@@ -1693,7 +1725,7 @@ const RegularInvoice: React.FC = () => {
       )}
       {/* ?? */}
       <HvoPageHeader
-        title={tr('전자세금계산서', 'E-Invoice')}
+        title={tr('일반 세금계산서', 'Regular Tax Invoice')}
         description={tr('일반 세금계산서를 생성하고 관리합니다.', 'Create and manage regular invoices.')}
         mb={!isInvoicePageMode ? 2 : 3}
       />

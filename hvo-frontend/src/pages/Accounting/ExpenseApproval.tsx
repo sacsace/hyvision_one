@@ -27,12 +27,15 @@ import {
   Divider,
   Avatar,
   LinearProgress,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   FormControlLabel,
   Checkbox,
+  Radio,
+  RadioGroup,
   Tabs,
   Tab,
   Autocomplete,
@@ -74,12 +77,11 @@ import {
   OpenInNew as OpenInNewIcon,
   InsertDriveFile as FileIcon } from '@mui/icons-material';
 import { useStore } from '../../store';
-import { isSingleCompanyMode } from '../../config/singleCompany';
 import { useNavigate } from 'react-router-dom';
 import { accountingService, companyService, workAssigneeListService } from '../../services/api';
 import { resolveHeaderCompanyInfo, useReferenceDataStore } from '../../store/referenceDataStore';
 import { resolveRegisteredStateCodeFromCompanyLike } from '../HR/payroll/indianProfessionalTax';
-import { getUploadUrl, downloadUploadFile } from '../../utils/uploadUrl';
+import { getUploadUrl, downloadUploadFile, fetchUploadObjectUrl } from '../../utils/uploadUrl';
 import AuthMedia from '../../components/Common/AuthMedia';
 import QRCode from 'qrcode';
 import { useTranslation } from 'react-i18next';
@@ -87,7 +89,16 @@ import {
   buildExpenseApprovalPdfFilename,
   downloadExpenseApprovalPdf,
   EXPENSE_DOCUMENT_EXPORT_CSS,
+  EXPENSE_ITEMS_QTY_COL_WIDTH_PX,
+  EXPENSE_ITEMS_UNIT_PRICE_COL_WIDTH_PX,
+  EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+  EXPENSE_TAX_BOX_WIDTH_PERCENT,
+  EXPENSE_TAX_BOX_WIDTH_PX,
+  EXPENSE_TAX_RATE_COL_WIDTH_PX,
 } from '../../utils/expenseApprovalPdf';
+import { buildDocumentDownloadFilename } from '../../utils/pdf';
+import { normalizePartnerCompanyName } from '../../utils/partnerCompanyName';
+import { formatEnglishSentenceLabel } from '../../utils/textCase';
 
 const expenseApprovalFilterFieldSx = {
   ...(hvoSearchFieldSx as Record<string, unknown>),
@@ -96,35 +107,91 @@ const expenseApprovalFilterFieldSx = {
 /** expense-receipts/1784..._IMG.jpg → IMG.jpg */
 const getReceiptDisplayName = (filePath: string): string => {
   const base = String(filePath || '').split(/[/\\]/).pop() || String(filePath || '');
+  // 표준명 yyyyMMdd_PV|RT|RI (...) 은 그대로 표시
+  if (/^\d{8}_[A-Za-z]/.test(base)) return base;
+  // 레거시 timestamp_원본명
   return base.replace(/^\d+_/, '') || base;
 };
 
 const isImageReceipt = (filePath: string): boolean =>
-  /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(String(filePath || ''));
+  /\.(jpe?g|png|gif|webp|bmp|heic)(?:$|[?#])/i.test(String(filePath || ''));
 
-const normalizeAttachmentPaths = (value: unknown): string[] => {
+const isPdfReceipt = (filePath: string): boolean =>
+  /\.pdf(?:$|[?#])/i.test(String(filePath || ''));
+
+type ExpenseInvoiceType = 'tax' | 'proforma';
+
+type ExpenseAttachment = {
+  path: string;
+  invoiceType: ExpenseInvoiceType;
+};
+
+const normalizeExpenseInvoiceType = (value: unknown): ExpenseInvoiceType => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'proforma' || raw === 'proforma_invoice' || raw === 'pi') return 'proforma';
+  return 'tax';
+};
+
+const normalizeExpenseAttachments = (value: unknown): ExpenseAttachment[] => {
   if (!value) return [];
   let parsed: unknown = value;
   if (typeof value === 'string') {
     try {
       parsed = JSON.parse(value);
     } catch {
-      return value.trim() ? [value.trim()] : [];
+      const path = value.trim();
+      return path ? [{ path, invoiceType: 'tax' }] : [];
     }
   }
-  if (Array.isArray(parsed)) {
-    return parsed
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object') {
-          const obj = item as { path?: string; url?: string; file?: string };
-          return obj.path || obj.url || obj.file || '';
-        }
-        return '';
-      })
-      .filter(Boolean);
-  }
-  return [];
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((item) => {
+      if (typeof item === 'string') {
+        const path = item.trim();
+        return path ? { path, invoiceType: 'tax' as const } : null;
+      }
+      if (item && typeof item === 'object') {
+        const obj = item as {
+          path?: string;
+          url?: string;
+          file?: string;
+          invoiceType?: string;
+          invoice_type?: string;
+        };
+        const path = String(obj.path || obj.url || obj.file || '').trim();
+        if (!path) return null;
+        return {
+          path,
+          invoiceType: normalizeExpenseInvoiceType(obj.invoiceType ?? obj.invoice_type),
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as ExpenseAttachment[];
+};
+
+/** @deprecated use normalizeExpenseAttachments */
+const normalizeAttachmentPaths = (value: unknown): string[] =>
+  normalizeExpenseAttachments(value).map((row) => row.path);
+
+const expenseHasTaxInvoice = (attachments: ExpenseAttachment[] | string[] | unknown) =>
+  normalizeExpenseAttachments(attachments).some((row) => row.invoiceType === 'tax');
+
+const expenseIsAwaitingTaxInvoice = (expense: {
+  attachments?: ExpenseAttachment[] | string[];
+  totalAmount?: number;
+  paidAmount?: number;
+  status?: string;
+  paymentRequestStatus?: string;
+}) => {
+  const total = Number(expense.totalAmount || 0);
+  const paid = Number(expense.paidAmount || 0);
+  const remaining = Math.max(0, total - paid);
+  if (remaining > 0) return false;
+  if (paid <= 0) return false;
+  if (String(expense.paymentRequestStatus || '').toLowerCase() === 'paid') return false;
+  if (expense.status === 'paid') return false;
+  return !expenseHasTaxInvoice(expense.attachments);
 };
 
 interface ExpenseItem {
@@ -136,7 +203,41 @@ interface ExpenseItem {
   total: number;
   date?: string;
   amount?: number;
+  /** TDS 양식 전용 */
+  pan?: string;
+  tdsRate?: number;
+  deducteeType?: 'company' | 'other';
+  tdsSection?: string;
+  tdsCode?: string;
+  tdsAmount?: number;
+  tdsInterest?: number;
+  remarks?: string;
 }
+
+type ExpenseFormType = 'general' | 'gst' | 'tds';
+
+const resolveExpenseFormType = (meta?: Record<string, any> | null): ExpenseFormType => {
+  const raw = String(meta?.formType || meta?.form_type || '').trim().toLowerCase();
+  if (raw === 'general' || raw === 'gst' || raw === 'tds') return raw;
+  return 'general';
+};
+
+const calcTdsLineAmounts = (item: {
+  amount?: number;
+  unitPrice?: number;
+  qty?: number;
+  tdsRate?: number;
+  tdsInterest?: number;
+}) => {
+  const base = floorMoney(
+    Number(item.amount ?? 0) || Number(item.unitPrice || 0) * Number(item.qty || 1)
+  );
+  const rate = Number(item.tdsRate || 0);
+  const tdsAmt = floorMoney(base * (rate / 100));
+  const interest = floorMoney(Number(item.tdsInterest || 0));
+  const payable = floorMoney(Math.max(0, base - tdsAmt));
+  return { base, tdsAmt, interest, payable, lineTotal: floorMoney(tdsAmt + interest) };
+};
 
 interface PartnerOption {
   id: number;
@@ -174,7 +275,7 @@ interface ExpenseApprovalItem {
   submittedAt: string;
   dueDate: string;
   notes?: string;
-  attachments: string[];
+  attachments: ExpenseAttachment[];
   itemMeta?: Record<string, any>;
   approvalId?: number;
   paymentRequestStatus?: string;
@@ -221,7 +322,7 @@ interface ApprovalStep {
   approvedAt?: string;
   assignedAt?: string;
   comment?: string;
-  action?: 'assigned' | 'reassigned' | 'approved' | 'rejected';
+  action?: 'assigned' | 'reassigned' | 'approved' | 'rejected' | 'revision_rejected' | 'edited' | 'changed';
   changedById?: number;
   changedByName?: string;
   previousApproverId?: number;
@@ -242,13 +343,15 @@ const EXPENSE_HEADER_FG = '#1E293B';
 const EXPENSE_STAMP_LINE = '#94A3B8';
 const EXPENSE_STAMP_HEADER_BG = '#F1F5F9';
 const EXPENSE_STAMP_LABEL = '#0F172A';
-const EXPENSE_REQUEST_BG = '#FFFFFF';
-const EXPENSE_REQUEST_ACCENT = '#64748B';
 const EXPENSE_VENDOR_BG = '#FFFFFF';
-const EXPENSE_VENDOR_ACCENT = '#64748B';
-const EXPENSE_VENDOR_LINE = '#E2E8F0';
-const EXPENSE_VENDOR_HEADER = '#F1F5F9';
+/** 협력업체 섹션 외곽선 — 일반 테두리보다 뚜렷하게 (결재란 외곽선과 동일 톤) */
+const EXPENSE_VENDOR_LINE = '#94A3B8';
 const EXPENSE_VENDOR_SUB = '#64748B';
+
+/** 좌측 헤더·섹션 제목·항목명 공통 시작점 (테두리와 겹치지 않는 최소 여백) */
+const EXPENSE_TEXT_PAD_LEFT = '6px';
+/** KV 라벨 열 너비 (신청자·제목 등) */
+const EXPENSE_KV_LABEL_WIDTH_PX = 128;
 
 const sectionTitleSx = {
   fontWeight: 700,
@@ -256,6 +359,10 @@ const sectionTitleSx = {
   color: '#0F172A',
   mb: 0.5,
   letterSpacing: '-0.01em',
+  pl: EXPENSE_TEXT_PAD_LEFT,
+  ml: 0,
+  textAlign: 'left',
+  textIndent: 0,
 } as const;
 
 const COMPACT_ROW_HEIGHT = 40;
@@ -273,6 +380,12 @@ const compactTableSx = {
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    textAlign: 'left',
+  },
+  '& .MuiTableCell-root:first-child': {
+    paddingLeft: `${EXPENSE_TEXT_PAD_LEFT} !important`,
+    marginLeft: 0,
+    textIndent: 0,
   },
   '& .MuiTableRow-root': {
     height: COMPACT_ROW_HEIGHT,
@@ -300,12 +413,97 @@ const wrapCellSx = {
   maxWidth: 0,
 } as const;
 
+const expenseAmountCellSx = {
+  width: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+  minWidth: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+  maxWidth: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+  textAlign: 'right',
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
+  overflow: 'visible',
+  textOverflow: 'clip',
+} as const;
+
+const expenseItemsNumericGridSx = {
+  display: 'grid',
+  gridTemplateColumns: `minmax(0, 1fr) ${EXPENSE_ITEMS_QTY_COL_WIDTH_PX}px ${EXPENSE_ITEMS_UNIT_PRICE_COL_WIDTH_PX}px ${EXPENSE_TAX_AMOUNT_COL_WIDTH_PX}px`,
+  width: '100%',
+  alignItems: 'center',
+} as const;
+
+const expenseItemsNumericBlockCellSx = {
+  width: EXPENSE_TAX_BOX_WIDTH_PX,
+  minWidth: EXPENSE_TAX_BOX_WIDTH_PX,
+  maxWidth: EXPENSE_TAX_BOX_WIDTH_PX,
+  padding: '0 !important',
+  verticalAlign: 'middle',
+} as const;
+
+const expenseItemsNumericHeaderCellSx = {
+  textAlign: 'right',
+  px: 1,
+  fontWeight: 600,
+  fontSize: '0.75rem',
+  whiteSpace: 'nowrap',
+} as const;
+
+const expenseItemsNumericValueCellSx = {
+  textAlign: 'right',
+  px: 1,
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
+} as const;
+
+const expenseItemsTableSx = {
+  ...compactTableSx,
+  '& .expense-pdf-items-numeric-block': expenseItemsNumericBlockCellSx,
+  '& .expense-pdf-items-numeric-grid > *:nth-of-type(2), & .expense-pdf-items-numeric-grid > *:nth-of-type(3)':
+    expenseItemsNumericValueCellSx,
+  '& .expense-pdf-items-numeric-grid > *:nth-of-type(4)': {
+    ...expenseItemsNumericValueCellSx,
+    ...expenseAmountCellSx,
+    width: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+    minWidth: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+    maxWidth: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX,
+  },
+} as const;
+
+const expenseTaxTableSx = {
+  ...compactTableSx,
+  tableLayout: 'fixed',
+  width: '100%',
+  '& .MuiTableCell-root': {
+    ...compactTableSx['& .MuiTableCell-root'],
+    overflow: 'visible',
+    textOverflow: 'clip',
+  },
+  '& .MuiTableCell-root:nth-of-type(2)': {
+    width: EXPENSE_TAX_RATE_COL_WIDTH_PX,
+    minWidth: EXPENSE_TAX_RATE_COL_WIDTH_PX,
+    maxWidth: EXPENSE_TAX_RATE_COL_WIDTH_PX,
+    textAlign: 'center',
+  },
+  '& .MuiTableCell-root:nth-of-type(3)': expenseAmountCellSx,
+} as const;
+
+const expenseTaxTableContainerSx = {
+  border: `1px solid ${EXPENSE_LINE}`,
+  width: '100%',
+  overflow: 'visible',
+  overflowX: 'hidden',
+} as const;
+
 const ClampText: React.FC<{ children: React.ReactNode; title?: string; sx?: object }> = ({
   children,
   title,
   sx,
 }) => (
-  <Box component="span" title={title} sx={{ ...wrapTwoLineSx, fontWeight: 'inherit', color: 'inherit', ...sx }}>
+  <Box
+    component="span"
+    className="expense-clamp"
+    title={title}
+    sx={{ ...wrapTwoLineSx, fontWeight: 'inherit', color: 'inherit', ...sx }}
+  >
     {children}
   </Box>
 );
@@ -314,8 +512,14 @@ const kvLabelCellSx = {
   bgcolor: EXPENSE_MUTED_BG,
   color: '#64748B',
   fontWeight: 600,
-  width: 128,
-  maxWidth: 128,
+  width: EXPENSE_KV_LABEL_WIDTH_PX,
+  minWidth: EXPENSE_KV_LABEL_WIDTH_PX,
+  maxWidth: EXPENSE_KV_LABEL_WIDTH_PX,
+  pl: `${EXPENSE_TEXT_PAD_LEFT} !important`,
+  textAlign: 'left',
+  textIndent: 0,
+  ml: 0,
+  boxSizing: 'border-box',
 } as const;
 
 const voucherMetaWrapSx = {
@@ -324,11 +528,12 @@ const voucherMetaWrapSx = {
   maxWidth: '100%',
   display: 'grid',
   // 라벨 88px·값 영역 기준 가로 약 20% 확대
-  gridTemplateColumns: '106px minmax(17ch, auto)',
+  gridTemplateColumns: `${EXPENSE_KV_LABEL_WIDTH_PX}px minmax(17ch, auto)`,
 } as const;
 
 const voucherMetaLabelSx = {
-  px: 1,
+  pl: EXPENSE_TEXT_PAD_LEFT,
+  pr: 1,
   py: 0.75,
   bgcolor: EXPENSE_MUTED_BG,
   color: '#64748B',
@@ -336,6 +541,8 @@ const voucherMetaLabelSx = {
   fontSize: '0.75rem',
   borderRight: `1px solid ${EXPENSE_LINE}`,
   whiteSpace: 'nowrap',
+  textAlign: 'left',
+  textIndent: 0,
 } as const;
 
 const voucherMetaValueSx = {
@@ -347,22 +554,69 @@ const voucherMetaValueSx = {
   whiteSpace: 'nowrap',
 } as const;
 
+const EXPENSE_APPROVAL_STAMPS_PER_ROW = 4;
+
+const chunkApprovalFlowNodes = <T,>(nodes: T[], size: number): T[][] => {
+  const rows: T[][] = [];
+  for (let i = 0; i < nodes.length; i += size) {
+    rows.push(nodes.slice(i, i + size));
+  }
+  return rows;
+};
+
+/** Payment Voucher 아래 결재란 — 4칸마다 다음 줄, 우측 정렬 */
+const expenseApprovalStampsGridSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: 1,
+  width: 'max-content',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+} as const;
+
+const expenseApprovalStampsRowSx = {
+  display: 'flex',
+  flexDirection: 'row',
+  flexWrap: 'nowrap',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  width: 'max-content',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+} as const;
+
+const expenseApprovalStampWrapSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+  flexShrink: 0,
+  width: 'auto',
+} as const;
+
 const ExpenseFlowStamp = ({
   label,
   name,
   muted,
   wide,
+  fluidWidth,
+  relaxedLabel,
   children,
 }: {
   label: string;
   name: string;
   muted?: boolean;
   wide?: boolean;
+  fluidWidth?: boolean;
+  relaxedLabel?: boolean;
   children?: React.ReactNode;
 }) => (
   <Box
+    className={`expense-flow-stamp${relaxedLabel ? ' expense-flow-stamp--relaxed-label' : ''}`}
     sx={{
-      width: wide ? 222 : 140,
+      width: wide ? 222 : fluidWidth ? 'auto' : 140,
+      minWidth: wide ? 222 : relaxedLabel ? 168 : fluidWidth ? 120 : 140,
+      maxWidth: wide ? 222 : relaxedLabel ? 'none' : fluidWidth ? 240 : 140,
       flexShrink: 0,
       border: `1px solid ${EXPENSE_STAMP_LINE}`,
       bgcolor: '#FFFFFF',
@@ -375,14 +629,24 @@ const ExpenseFlowStamp = ({
   >
     <Box
       sx={{
-        px: 0.5,
+        px: relaxedLabel ? 1.25 : 0.5,
         py: 0.35,
         textAlign: 'center',
         bgcolor: EXPENSE_STAMP_HEADER_BG,
         borderBottom: `1px solid ${EXPENSE_STAMP_LINE}`,
       }}
     >
-      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem', color: EXPENSE_STAMP_LABEL }}>
+      <Typography
+        variant="caption"
+        sx={{
+          fontWeight: 700,
+          fontSize: '0.75rem',
+          color: EXPENSE_STAMP_LABEL,
+          whiteSpace: relaxedLabel || !fluidWidth ? 'nowrap' : 'normal',
+          lineHeight: 1.2,
+          wordBreak: 'keep-all',
+        }}
+      >
         {label}
       </Typography>
     </Box>
@@ -463,7 +727,7 @@ const ExpenseVoucherMetaTable = ({
   voucherLabel: string;
   dateLabel: string;
 }) => (
-  <Box sx={voucherMetaWrapSx}>
+  <Box className="expense-pdf-voucher-meta" sx={voucherMetaWrapSx}>
     <Box sx={{ ...voucherMetaLabelSx, borderBottom: `1px solid ${EXPENSE_LINE}` }}>{voucherLabel}</Box>
     <Box sx={{ ...voucherMetaValueSx, borderBottom: `1px solid ${EXPENSE_LINE}` }}>{voucherNo}</Box>
     <Box sx={voucherMetaLabelSx}>{dateLabel}</Box>
@@ -487,6 +751,7 @@ const ExpenseCompanyBlock = ({
   if (!logo && !name && !address && !gstNumber) return null;
   return (
     <Box
+      className="expense-pdf-company"
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -501,7 +766,7 @@ const ExpenseCompanyBlock = ({
           src={logo}
           alt={logoAlt}
           sx={{
-            display: 'block',
+  display: 'block',
             alignSelf: 'flex-start',
             maxHeight: 36,
             maxWidth: 160,
@@ -512,12 +777,16 @@ const ExpenseCompanyBlock = ({
         />
       ) : null}
       {name ? (
-        <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0F172A', lineHeight: 1.3 }}>
+        <Typography
+          className="expense-pdf-company-name"
+          sx={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0F172A', lineHeight: 1.3 }}
+        >
           {name}
         </Typography>
       ) : null}
       {address ? (
         <Typography
+          className="expense-pdf-company-address"
           sx={{
             fontSize: '0.75rem',
             color: '#64748B',
@@ -526,7 +795,7 @@ const ExpenseCompanyBlock = ({
             wordBreak: 'break-word',
           }}
         >
-          {address}
+          {formatEnglishSentenceLabel(address)}
         </Typography>
       ) : null}
       {gstNumber ? (
@@ -542,16 +811,6 @@ const sectionBlockSx = {
   border: `1px solid ${EXPENSE_LINE}`,
   bgcolor: '#FFFFFF',
   overflow: 'hidden',
-} as const;
-
-const sectionHeaderBarSx = {
-  px: 1,
-  py: 0,
-  height: COMPACT_ROW_HEIGHT,
-  borderBottom: `1px solid ${EXPENSE_LINE}`,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 0.75,
 } as const;
 
 const formatLocalYmd = (value?: Date | string | null) => {
@@ -570,11 +829,26 @@ const formatLocalYmd = (value?: Date | string | null) => {
   return `${y}-${m}-${day}`;
 };
 
-const takeFileNameSnippet = (value: string, maxChars: number) => {
-  const cleaned = String(value || '')
-    .replace(/[\\/:*?"<>|]/g, ' ')
-    .replace(/\s+/g, ' ')
+/** 파일명에서 Private Limited / Pvt Ltd 등 법인 접미사 항상 제거 */
+const stripCorporateSuffixFromFilename = (value: string) =>
+  String(value || '')
+    .replace(/\bprivate\s+limited\b\.?/gi, '')
+    .replace(/\bprivate\s+ltd\.?\b/gi, '')
+    .replace(/\bpvt\.?\s*ltd\.?\b/gi, '')
+    .replace(/\bpvt\.?\s*limited\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
+    .replace(/\s+\./g, '.')
     .trim();
+
+const takeFileNameSnippet = (value: string, maxChars: number) => {
+  const cleaned = stripCorporateSuffixFromFilename(
+    String(value || '')
+      .replace(/[\\/:*?"<>|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
   if (!cleaned) return '';
   return Array.from(cleaned).slice(0, maxChars).join('');
 };
@@ -592,12 +866,42 @@ const buildRemittanceProofFileName = (file: File, partnerName?: string, descript
   return `${ymd}_RT (${partner}) (${desc}).${ext}`;
 };
 
+const getFileExtension = (fileName: string) => {
+  const base = String(fileName || '').split(/[/\\]/).pop() || '';
+  const idx = base.lastIndexOf('.');
+  if (idx <= 0 || idx === base.length - 1) return '';
+  return base.slice(idx + 1);
+};
+
+/** 확장자는 유지하고 표시 파일명만 변경 */
+const renameFileKeepingExtension = (file: File, nextName: string): File => {
+  const cleaned = stripCorporateSuffixFromFilename(
+    String(nextName || '')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+  if (!cleaned) return file;
+  const ext = getFileExtension(file.name);
+  const withoutExt = cleaned.replace(/\.[^.]+$/, '').trim() || cleaned;
+  const finalName = ext ? `${withoutExt}.${ext}` : withoutExt;
+  if (finalName === file.name) return file;
+  return new File([file], finalName, { type: file.type, lastModified: file.lastModified });
+};
+
 const getTodayLocalYmd = () => formatLocalYmd(new Date());
 
+/** 소수점 이하 자동 차감(내림/절삭) — 정수 금액만 사용 */
+const floorMoney = (value: number): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return n >= 0 ? Math.floor(n) : Math.ceil(n);
+};
+
 const formatAmount = (value: number) =>
-  Number(value || 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  floorMoney(value).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 
 const GST_SPLIT_RATE = 9;
@@ -612,10 +916,12 @@ const PRIORITY_SORT_ORDER: Record<string, number> = {
 const STATUS_SORT_ORDER: Record<string, number> = {
   in_review: 0,
   submitted: 1,
-  draft: 2,
-  approved: 3,
-  paid: 4,
-  rejected: 5,
+  revision_rejected: 2,
+  draft: 3,
+  approved: 4,
+  awaiting_tax: 5,
+  paid: 6,
+  rejected: 7,
 };
 
 const paidStatusChipSx = {
@@ -680,8 +986,14 @@ const parseApprovalFlow = (value: any): ApprovalStep[] => {
 };
 
 const getExpenseFlowStampLabel = (step: ApprovalStep, translate: (key: string) => string) => {
+  if (step.action === 'revision_rejected') {
+    return translate('expenseApproval.flow.actions.revisionRejected');
+  }
   if (step.action === 'rejected' || step.status === 'rejected') {
     return translate('expenseApproval.flow.actions.rejected');
+  }
+  if (step.action === 'edited') {
+    return translate('expenseApproval.flow.actions.edited');
   }
   if (step.status === 'skipped') {
     return translate('expenseApproval.flow.actions.changed');
@@ -694,6 +1006,9 @@ const getExpenseFlowStampLabel = (step: ApprovalStep, translate: (key: string) =
   }
   return translate('expenseApproval.voucher.approved');
 };
+
+const isRevisionRejectedExpense = (expense: Pick<ExpenseApprovalItem, 'status' | 'itemMeta'>) =>
+  expense.status === 'rejected' && expense.itemMeta?.revisionRejected === true;
 
 const displayExpenseCurrency = (_currency?: string) => 'INR';
 
@@ -709,20 +1024,79 @@ const readMetaNumber = (meta: Record<string, any> | undefined, ...keys: string[]
 };
 
 const calcExpenseTax = (
-  items: Array<{ total?: number; amount?: number }> | undefined,
+  items: Array<{
+    total?: number;
+    amount?: number;
+    unitPrice?: number;
+    qty?: number;
+    tdsRate?: number;
+    tdsAmount?: number;
+    tdsInterest?: number;
+  }> | undefined,
   meta: Record<string, any> | undefined,
   companyGstNumber = '',
   companyGstState = ''
 ) => {
-  const subtotal = (items || []).reduce(
-    (sum, item) => sum + Number(item.total ?? item.amount ?? 0),
-    0
+  const formType = resolveExpenseFormType(meta);
+  const rows = items || [];
+
+  if (formType === 'tds') {
+    let gross = 0;
+    let tdsSum = 0;
+    let interestSum = 0;
+    for (const item of rows) {
+      const calc = calcTdsLineAmounts(item);
+      gross += calc.base;
+      tdsSum += Number(item.tdsAmount ?? calc.tdsAmt);
+      interestSum += calc.interest;
+    }
+    gross = floorMoney(gross);
+    tdsSum = floorMoney(tdsSum);
+    interestSum = floorMoney(interestSum);
+    return {
+      formType,
+      subtotal: gross,
+      igstRate: 0,
+      cgstRate: 0,
+      sgstRate: 0,
+      tdsEnabled: true,
+      tdsRate: 0,
+      igstAmount: 0,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      tdsAmount: tdsSum,
+      tdsInterestAmount: interestSum,
+      grandTotal: floorMoney(Math.max(0, gross - tdsSum)),
+    };
+  }
+
+  const subtotal = floorMoney(
+    rows.reduce((sum, item) => sum + Number(item.total ?? item.amount ?? 0), 0)
   );
+
+  if (formType === 'general') {
+    return {
+      formType,
+      subtotal,
+      igstRate: 0,
+      cgstRate: 0,
+      sgstRate: 0,
+      tdsEnabled: false,
+      tdsRate: 0,
+      igstAmount: 0,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      tdsAmount: 0,
+      tdsInterestAmount: 0,
+      grandTotal: subtotal,
+    };
+  }
+
   let igstRate = readMetaNumber(meta, 'igstRate', 'igst_rate');
   let cgstRate = readMetaNumber(meta, 'cgstRate', 'cgst_rate');
   let sgstRate = readMetaNumber(meta, 'sgstRate', 'sgst_rate');
-  const tdsEnabled = Boolean(meta?.tdsEnabled ?? meta?.tds_enabled);
-  const tdsRate = tdsEnabled ? readMetaNumber(meta, 'tdsRate', 'tds_rate') : 0;
+  const legacyTds = Boolean(meta?.tdsEnabled ?? meta?.tds_enabled);
+  const tdsRate = legacyTds ? readMetaNumber(meta, 'tdsRate', 'tds_rate') : 0;
   const gstNumber = String(meta?.gstNumber || meta?.gst_number || '').trim();
   if (igstRate === 0 && cgstRate === 0 && sgstRate === 0 && looksLikeGstin(gstNumber)) {
     const resolved = resolveGstRatesFromGstin(gstNumber, companyGstNumber, companyGstState);
@@ -730,22 +1104,24 @@ const calcExpenseTax = (
     cgstRate = resolved.cgstRate;
     sgstRate = resolved.sgstRate;
   }
-  const igstAmount = subtotal * (igstRate / 100);
-  const cgstAmount = subtotal * (cgstRate / 100);
-  const sgstAmount = subtotal * (sgstRate / 100);
-  const tdsAmount = subtotal * (tdsRate / 100);
+  const igstAmount = floorMoney(subtotal * (igstRate / 100));
+  const cgstAmount = floorMoney(subtotal * (cgstRate / 100));
+  const sgstAmount = floorMoney(subtotal * (sgstRate / 100));
+  const tdsAmount = floorMoney(subtotal * (tdsRate / 100));
   return {
+    formType,
     subtotal,
     igstRate,
     cgstRate,
     sgstRate,
-    tdsEnabled,
+    tdsEnabled: legacyTds,
     tdsRate,
     igstAmount,
     cgstAmount,
     sgstAmount,
     tdsAmount,
-    grandTotal: subtotal + igstAmount + cgstAmount + sgstAmount - tdsAmount,
+    tdsInterestAmount: 0,
+    grandTotal: floorMoney(subtotal + igstAmount + cgstAmount + sgstAmount - tdsAmount),
   };
 };
 
@@ -797,7 +1173,6 @@ const ExpenseApproval: React.FC = () => {
   const { user } = useStore();
   const navigate = useNavigate();
   const isRootUser = user?.role === 'root';
-  const showCompanyFilter = isRootUser && !isSingleCompanyMode();
   const hasTransferAccess = Boolean(user?.is_payment_officer) || isRootUser;
   const [expenses, setExpenses] = useState<ExpenseApprovalItem[]>([]);
   const [filteredExpenses, setFilteredExpenses] = useState<ExpenseApprovalItem[]>([]);
@@ -838,11 +1213,15 @@ const ExpenseApproval: React.FC = () => {
     notes: ''
   });
   const [lineItems, setLineItems] = useState<ExpenseItem[]>([]);
-  const [currentAttachments, setCurrentAttachments] = useState<string[]>([]);
+  const [currentAttachments, setCurrentAttachments] = useState<ExpenseAttachment[]>([]);
+  const [deletingReceiptPath, setDeletingReceiptPath] = useState<string | null>(null);
   const [approvers, setApprovers] = useState<Array<{ id: number; name: string }>>([]);
   const [partners, setPartners] = useState<PartnerOption[]>([]);
+  const [partnerScopeEnforced, setPartnerScopeEnforced] = useState(false);
+  const [partnerLoadError, setPartnerLoadError] = useState(false);
   const [partnerInputValue, setPartnerInputValue] = useState('');
   const [voucherData, setVoucherData] = useState({
+    formType: 'general' as ExpenseFormType,
     department: '',
     partnerId: '',
     voucherNo: '',
@@ -875,17 +1254,28 @@ const ExpenseApproval: React.FC = () => {
   const [qrImage, setQrImage] = useState('');
   const [qrImageError, setQrImageError] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
+  const [previewDownloadName, setPreviewDownloadName] = useState('');
+  const [receiptInvoiceType, setReceiptInvoiceType] = useState<ExpenseInvoiceType>('tax');
+  const [previewBlobUrl, setPreviewBlobUrl] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLoadError, setPreviewLoadError] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentAmountInput, setPaymentAmountInput] = useState('');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreviewUrl, setPaymentProofPreviewUrl] = useState<string>('');
+  const [proofNameDraft, setProofNameDraft] = useState('');
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const lastSavedPayloadRef = useRef<string>('');
+  /** 초안 생성 중복 방지 (의존성 루프/StrictMode 대비) */
+  const draftInitInFlightRef = useRef(false);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [uploadingReceipts, setUploadingReceipts] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
-  const [reasonDialogType, setReasonDialogType] = useState<'payment-approve' | 'payment-reject' | 'expense-reject'>('payment-approve');
+  const [reasonDialogType, setReasonDialogType] = useState<
+    'payment-approve' | 'payment-reject' | 'expense-reject' | 'expense-revision-reject' | 'expense-edit'
+  >('payment-approve');
   const [reasonText, setReasonText] = useState('');
   const [reasonTargetId, setReasonTargetId] = useState<number | null>(null);
   const [approverSaving, setApproverSaving] = useState(false);
@@ -932,7 +1322,7 @@ const ExpenseApproval: React.FC = () => {
     submittedAt: expense.submitted_at || '',
     dueDate: expense.due_date || '',
     notes: expense.notes || '',
-    attachments: normalizeAttachmentPaths(expense.attachments),
+    attachments: normalizeExpenseAttachments(expense.attachments),
     itemMeta: parsedItems.meta,
     approvalId: expense.approval_id || undefined,
     paymentRequestStatus: expense.payment_request_status || undefined,
@@ -958,39 +1348,73 @@ const ExpenseApproval: React.FC = () => {
     };
   };
 
-  const subtotalAmount = useMemo(
-    () => lineItems.reduce((sum, item) => sum + Number(item.total || 0), 0),
-    [lineItems]
-  );
+  const subtotalAmount = useMemo(() => {
+    if (voucherData.formType === 'tds') {
+      return floorMoney(
+        lineItems.reduce((sum, item) => sum + calcTdsLineAmounts(item).base, 0)
+      );
+    }
+    return floorMoney(lineItems.reduce((sum, item) => sum + Number(item.total || 0), 0));
+  }, [lineItems, voucherData.formType]);
   const igstAmount = useMemo(
-    () => subtotalAmount * (Number(voucherData.igstRate || 0) / 100),
-    [subtotalAmount, voucherData.igstRate]
+    () =>
+      voucherData.formType === 'gst'
+        ? floorMoney(subtotalAmount * (Number(voucherData.igstRate || 0) / 100))
+        : 0,
+    [subtotalAmount, voucherData.formType, voucherData.igstRate]
   );
   const cgstAmount = useMemo(
-    () => subtotalAmount * (Number(voucherData.cgstRate || 0) / 100),
-    [subtotalAmount, voucherData.cgstRate]
+    () =>
+      voucherData.formType === 'gst'
+        ? floorMoney(subtotalAmount * (Number(voucherData.cgstRate || 0) / 100))
+        : 0,
+    [subtotalAmount, voucherData.formType, voucherData.cgstRate]
   );
   const sgstAmount = useMemo(
-    () => subtotalAmount * (Number(voucherData.sgstRate || 0) / 100),
-    [subtotalAmount, voucherData.sgstRate]
-  );
-  const tdsAmount = useMemo(
     () =>
-      voucherData.tdsEnabled
-        ? subtotalAmount * (Number(voucherData.tdsRate || 0) / 100)
+      voucherData.formType === 'gst'
+        ? floorMoney(subtotalAmount * (Number(voucherData.sgstRate || 0) / 100))
         : 0,
-    [subtotalAmount, voucherData.tdsEnabled, voucherData.tdsRate]
+    [subtotalAmount, voucherData.formType, voucherData.sgstRate]
   );
-  const totalAmount = useMemo(
-    () => subtotalAmount + igstAmount + cgstAmount + sgstAmount - tdsAmount,
-    [subtotalAmount, igstAmount, cgstAmount, sgstAmount, tdsAmount]
-  );
+  const tdsAmount = useMemo(() => {
+    if (voucherData.formType === 'tds') {
+      return floorMoney(
+        lineItems.reduce((sum, item) => {
+          const calc = calcTdsLineAmounts(item);
+          return sum + Number(item.tdsAmount ?? calc.tdsAmt);
+        }, 0)
+      );
+    }
+    if (voucherData.formType === 'gst' && voucherData.tdsEnabled) {
+      return floorMoney(subtotalAmount * (Number(voucherData.tdsRate || 0) / 100));
+    }
+    return 0;
+  }, [lineItems, subtotalAmount, voucherData.formType, voucherData.tdsEnabled, voucherData.tdsRate]);
+  const tdsInterestAmount = useMemo(() => {
+    if (voucherData.formType !== 'tds') return 0;
+    return floorMoney(lineItems.reduce((sum, item) => sum + Number(item.tdsInterest || 0), 0));
+  }, [lineItems, voucherData.formType]);
+  const totalAmount = useMemo(() => {
+    if (voucherData.formType === 'tds') {
+      return floorMoney(Math.max(0, subtotalAmount - tdsAmount));
+    }
+    if (voucherData.formType === 'general') return subtotalAmount;
+    return floorMoney(subtotalAmount + igstAmount + cgstAmount + sgstAmount - tdsAmount);
+  }, [
+    voucherData.formType,
+    subtotalAmount,
+    igstAmount,
+    cgstAmount,
+    sgstAmount,
+    tdsAmount,
+  ]);
 
   const loadExpenseData = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, number> = {};
-      if (showCompanyFilter && companyFilterId) {
+      if (isRootUser && companyFilterId) {
         params.company_id = Number(companyFilterId);
       }
       const response = await accountingService.getExpenseReports(params);
@@ -1008,14 +1432,17 @@ const ExpenseApproval: React.FC = () => {
     }
   // mapExpense is a render-local mapper; listing it would refetch on every render
   // eslint-disable-next-line react-hooks/exhaustive-deps -- stable mapping helper
-  }, [t, showCompanyFilter, companyFilterId]);
+  }, [t, isRootUser, companyFilterId]);
 
   const getTransferFilterKey = useCallback((expense: ExpenseApprovalItem) => {
-    const total = Number(expense.totalAmount || 0);
-    const paid = Number(expense.paidAmount || 0);
-    const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
+    const total = floorMoney(Number(expense.totalAmount || 0));
+    const paid = floorMoney(Number(expense.paidAmount || 0));
+    const remaining = Math.max(0, total - paid);
     if (String(expense.bankTransferStatus || '').toLowerCase() === 'failed') {
       return 'transfer_failed';
+    }
+    if (expenseIsAwaitingTaxInvoice(expense)) {
+      return 'awaiting_tax';
     }
     if (
       remaining <= 0 ||
@@ -1028,54 +1455,185 @@ const ExpenseApproval: React.FC = () => {
     return 'transfer_pending';
   }, []);
 
+  /** 목록에서 '지급 완료'로 취급 (택스 인보이스 대기 건은 제외) */
+  const isExpensePaidForList = useCallback((expense: ExpenseApprovalItem) => {
+    if (expenseIsAwaitingTaxInvoice(expense)) return false;
+    const total = floorMoney(Number(expense.totalAmount || 0));
+    const paid = floorMoney(Number(expense.paidAmount || 0));
+    const remaining = Math.max(0, total - paid);
+    const paymentPaid = String(expense.paymentRequestStatus || '').toLowerCase() === 'paid';
+    return (
+      paymentPaid ||
+      expense.status === 'paid' ||
+      (paid > 0 && remaining <= 0 && ['approved', 'paid'].includes(expense.status))
+    );
+  }, []);
+
   const buildExpensePayload = useCallback(
     (statusOverride?: ExpenseApprovalItem['status']) => ({
       title: formData.title,
       purpose: formData.purpose,
-      total_amount: Number(totalAmount.toFixed(2)),
+      total_amount: floorMoney(totalAmount),
       currency: 'INR',
+      requester_name: user?.username || '',
+      requester_department: user?.department || '',
+      requester_position: user?.position || '',
       current_approver_id: voucherData.approvedById ? Number(voucherData.approvedById) : null,
       priority: formData.priority,
       due_date: formData.dueDate || null,
       notes: formData.notes || '',
       items: {
-        rows: lineItems,
+        rows: lineItems.map((item) => ({
+          ...item,
+          unitPrice: floorMoney(Number(item.unitPrice || 0)),
+          total: floorMoney(Number(item.total || 0)),
+        })),
         meta: {
           ...voucherData,
-          checkedById: voucherData.approvedById || ''
-        }
+          checkedById: voucherData.approvedById || '',
+        },
       },
       status: statusOverride,
     }),
-    [formData, lineItems, voucherData, totalAmount]
+    [
+      formData,
+      lineItems,
+      voucherData,
+      totalAmount,
+      user?.username,
+      user?.department,
+      user?.position,
+    ]
   );
 
-  const ensureDraftExpense = useCallback(async () => {
-    if (viewMode !== 'create' || draftId || isInitializingDraft) return;
-    setIsInitializingDraft(true);
-    try {
-      const payload = buildExpensePayload('draft');
-      lastSavedPayloadRef.current = JSON.stringify(payload);
-      const response = await accountingService.createExpenseReport(payload);
-      if (!response?.success) {
-        throw new Error(response?.message || t('expenseApproval.errors.createDraftFailed'));
-      }
-      setDraftId(response.data?.id || null);
-      setCurrentAttachments(normalizeAttachmentPaths(response.data?.attachments));
-      const assignedNo =
-        parseExpenseItems(response.data?.items).meta?.voucherNo ||
-        response.data?.expense_id ||
-        '';
-      if (assignedNo) {
-        setVoucherData((prev) => ({ ...prev, voucherNo: assignedNo }));
-      }
-      setHeaderStatusBanner('draftCreated');
-    } catch {
-      setError(t('expenseApproval.errors.createDraftFailed'));
-    } finally {
-      setIsInitializingDraft(false);
+  // 작성 화면 진입 시 초안 1회만 생성
+  useEffect(() => {
+    if (viewMode !== 'create') {
+      draftInitInFlightRef.current = false;
+      return;
     }
-  }, [viewMode, draftId, isInitializingDraft, buildExpensePayload, t]);
+    if (draftId) return;
+
+    let cancelled = false;
+    setIsInitializingDraft(true);
+    draftInitInFlightRef.current = true;
+
+    void (async () => {
+      try {
+        const payload = buildExpensePayload('draft');
+        const response = await accountingService.createExpenseReport(payload);
+        if (cancelled) return;
+        if (!response?.success) {
+          throw new Error(response?.message || t('expenseApproval.errors.createDraftFailed'));
+        }
+        const newId = response.data?.id || null;
+        const assignedNo =
+          parseExpenseItems(response.data?.items).meta?.voucherNo ||
+          response.data?.expense_id ||
+          '';
+        setDraftId(newId);
+        setCurrentAttachments(normalizeExpenseAttachments(response.data?.attachments));
+        if (assignedNo) {
+          setVoucherData((prev) => {
+            if (prev.voucherNo === assignedNo) return prev;
+            return { ...prev, voucherNo: assignedNo };
+          });
+        }
+        lastSavedPayloadRef.current = JSON.stringify({
+          ...payload,
+          items: {
+            ...payload.items,
+            meta: {
+              ...payload.items.meta,
+              ...(assignedNo ? { voucherNo: assignedNo } : {}),
+            },
+          },
+        });
+        setHeaderStatusBanner('draftCreated');
+      } catch (err: any) {
+        if (cancelled) return;
+        draftInitInFlightRef.current = false;
+        const serverMsg = String(err?.response?.data?.message || '').trim();
+        setError(
+          serverMsg
+            ? `${t('expenseApproval.errors.createDraftFailed')} (${serverMsg})`
+            : t('expenseApproval.errors.createDraftFailed')
+        );
+      } finally {
+        if (!cancelled) setIsInitializingDraft(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      // Strict Mode remount 시 재시도 가능하도록
+      draftInitInFlightRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- create 진입·draftId 기준 (타이핑으로 재생성 금지)
+  }, [viewMode, draftId, t]);
+
+  // 초안 자동저장 (debounce). LinearProgress(saving)는 제출 시에만 사용해 깜빡임 방지.
+  useEffect(() => {
+    const activeExpenseId = viewMode === 'edit' ? selectedExpense?.id : draftId;
+    if (!activeExpenseId) return;
+    if (viewMode !== 'create' && viewMode !== 'edit') return;
+    if (isInitializingDraft) return;
+    if (
+      viewMode === 'edit' &&
+      selectedExpense &&
+      isRevisionRejectedExpense(selectedExpense)
+    ) {
+      return;
+    }
+
+    const payload = buildExpensePayload('draft');
+    const payloadString = JSON.stringify(payload);
+    if (payloadString === lastSavedPayloadRef.current) return;
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(async () => {
+      try {
+        const latest = buildExpensePayload('draft');
+        const latestString = JSON.stringify(latest);
+        if (latestString === lastSavedPayloadRef.current) return;
+        const response = await accountingService.updateExpenseReport(activeExpenseId, latest);
+        if (response?.success) {
+          setCurrentAttachments(normalizeExpenseAttachments(response.data?.attachments));
+          const assignedNo = parseExpenseItems(response.data?.items).meta?.voucherNo || '';
+          if (assignedNo) {
+            setVoucherData((prev) =>
+              prev.voucherNo === assignedNo ? prev : { ...prev, voucherNo: assignedNo }
+            );
+          }
+          lastSavedPayloadRef.current = latestString;
+          setHeaderStatusBanner('autoSaved');
+          setError('');
+        } else {
+          setHeaderStatusBanner('autoSaveFailed');
+          const msg = String(response?.message || '').trim();
+          if (msg) setError(`${t('expenseApproval.voucher.autoSaveFailed')}: ${msg}`);
+        }
+      } catch (err: any) {
+        setHeaderStatusBanner('autoSaveFailed');
+        const msg = String(err?.response?.data?.message || '').trim();
+        if (msg) setError(`${t('expenseApproval.voucher.autoSaveFailed')}: ${msg}`);
+      }
+    }, 800);
+
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [
+    formData,
+    lineItems,
+    voucherData,
+    draftId,
+    selectedExpense?.id,
+    viewMode,
+    isInitializingDraft,
+    buildExpensePayload,
+    t,
+  ]);
 
   const filterExpenses = useCallback(() => {
     let filtered = expenses;
@@ -1098,10 +1656,11 @@ const ExpenseApproval: React.FC = () => {
         filtered = [];
       } else {
         // 승인·지급완료 건을 송금 목록 대상으로 두고, 상태 필터로 송금완료까지 검색
+        // 기본(전체)에서는 지급/송금 완료 건 숨김 — transfer_completed 선택 시에만 표시
         filtered = filtered.filter((expense) => {
           if (expense.status !== 'approved' && expense.status !== 'paid') return false;
           const transferKey = getTransferFilterKey(expense);
-          if (!statusFilter) return true;
+          if (!statusFilter) return transferKey !== 'transfer_completed';
           return transferKey === statusFilter;
         });
       }
@@ -1122,8 +1681,18 @@ const ExpenseApproval: React.FC = () => {
     }
 
     // 송금 탭은 transfer_* 상태 필터를 위에서 적용
-    if (statusFilter && listTab !== 'transfer') {
-      filtered = filtered.filter((expense) => expense.status === statusFilter);
+    if (listTab !== 'transfer') {
+      if (statusFilter === 'paid') {
+        // 지급완료는 명시 선택 시에만 표시
+        filtered = filtered.filter((expense) => isExpensePaidForList(expense));
+      } else if (statusFilter) {
+        filtered = filtered.filter(
+          (expense) => !isExpensePaidForList(expense) && expense.status === statusFilter
+        );
+      } else {
+        // 전체: 지급완료 제외
+        filtered = filtered.filter((expense) => !isExpensePaidForList(expense));
+      }
     }
 
     if (priorityFilter) {
@@ -1140,6 +1709,7 @@ const ExpenseApproval: React.FC = () => {
     user,
     hasTransferAccess,
     getTransferFilterKey,
+    isExpensePaidForList,
   ]);
 
   const handleListSort = (key: ExpenseListSortKey) => {
@@ -1287,8 +1857,10 @@ const ExpenseApproval: React.FC = () => {
   useEffect(() => {
     const loadPartners = async () => {
       try {
+        setPartnerLoadError(false);
+        // 강제 새로고침 — 빈 캐시가 굳어 검색이 비는 문제 방지
         const [rows, scopeRes] = await Promise.all([
-          useReferenceDataStore.getState().fetchPartners(),
+          useReferenceDataStore.getState().fetchPartners(true),
           workAssigneeListService.getMyScope().catch(() => null),
         ]);
         const scope = scopeRes?.data;
@@ -1299,10 +1871,14 @@ const ExpenseApproval: React.FC = () => {
         );
         const allowedNames = new Set<string>(
           Array.isArray(scope?.partner_names)
-            ? scope.partner_names.map((n: any) => String(n || '').trim().toLowerCase()).filter(Boolean)
+            ? scope.partner_names
+                .map((n: any) => normalizePartnerCompanyName(n).trim().toLowerCase())
+                .filter(Boolean)
             : []
         );
-        const enforce = Boolean(scope?.enforced);
+        const enforce =
+          Boolean(scope?.enforced) && (allowedPartnerIds.size > 0 || allowedNames.size > 0);
+        setPartnerScopeEnforced(enforce);
 
         const normalized: PartnerOption[] = (Array.isArray(rows) ? rows : [])
           .map((p: any) => ({
@@ -1328,11 +1904,14 @@ const ExpenseApproval: React.FC = () => {
           .filter((p) => {
             if (!enforce) return true;
             if (allowedPartnerIds.has(p.id)) return true;
-            return allowedNames.has(p.company_name.trim().toLowerCase());
+            const nameKey = normalizePartnerCompanyName(p.company_name).trim().toLowerCase();
+            return Boolean(nameKey) && allowedNames.has(nameKey);
           });
         setPartners(normalized);
       } catch {
+        setPartnerLoadError(true);
         setPartners([]);
+        setPartnerScopeEnforced(false);
       }
     };
     loadPartners();
@@ -1386,48 +1965,10 @@ const ExpenseApproval: React.FC = () => {
       });
   }, [qrUrl, t]);
 
-  useEffect(() => {
-    ensureDraftExpense();
-  }, [ensureDraftExpense]);
-
-  useEffect(() => {
-    const activeExpenseId = viewMode === 'edit' ? selectedExpense?.id : draftId;
-    if (!activeExpenseId) return;
-    if (viewMode !== 'create' && viewMode !== 'edit') return;
-    if (isInitializingDraft) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        const payload = buildExpensePayload('draft');
-        const payloadString = JSON.stringify(payload);
-        if (payloadString === lastSavedPayloadRef.current) {
-          return;
-        }
-        setSaving(true);
-        const response = await accountingService.updateExpenseReport(activeExpenseId, payload);
-        if (response?.success) {
-          setCurrentAttachments(normalizeAttachmentPaths(response.data?.attachments));
-          const assignedNo = parseExpenseItems(response.data?.items).meta?.voucherNo || '';
-          if (assignedNo) {
-            setVoucherData((prev) => (prev.voucherNo === assignedNo ? prev : { ...prev, voucherNo: assignedNo }));
-          }
-          setHeaderStatusBanner('autoSaved');
-          lastSavedPayloadRef.current = payloadString;
-        }
-      } catch {
-        setHeaderStatusBanner('autoSaveFailed');
-      } finally {
-        setSaving(false);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [formData, lineItems, voucherData, draftId, selectedExpense?.id, viewMode, isInitializingDraft, buildExpensePayload]);
-
   const getExpenseRemainingAmount = useCallback((expense: ExpenseApprovalItem) => {
-    const total = Number(expense.totalAmount || 0);
-    const paid = Number(expense.paidAmount || 0);
-    return Math.max(0, Math.round((total - paid) * 100) / 100);
+    const total = floorMoney(Number(expense.totalAmount || 0));
+    const paid = floorMoney(Number(expense.paidAmount || 0));
+    return Math.max(0, total - paid);
   }, []);
 
   const getExpenseRemittanceEntries = (expense: ExpenseApprovalItem) => {
@@ -1454,9 +1995,10 @@ const ExpenseApproval: React.FC = () => {
     );
   };
 
-  /** 목록/상세 상태: 송금까지 끝나면 문서 status와 무관하게 지급 완료로 표시 */
+  /** 목록/상세 상태: 전액 송금 + Tax Invoice 있을 때만 지급 완료 */
   const resolveDisplayStatus = useCallback(
     (expense: ExpenseApprovalItem): ExpenseApprovalItem['status'] | string => {
+      if (expenseIsAwaitingTaxInvoice(expense)) return 'awaiting_tax';
       const remaining = getExpenseRemainingAmount(expense);
       const paymentPaid = String(expense.paymentRequestStatus || '').toLowerCase() === 'paid';
       const fullyRemitted =
@@ -1464,6 +2006,9 @@ const ExpenseApproval: React.FC = () => {
         expense.status === 'paid' ||
         (Number(expense.paidAmount || 0) > 0 && remaining <= 0 && ['approved', 'paid'].includes(expense.status));
       if (fullyRemitted) return 'paid';
+      if (expense.status === 'rejected' && expense.itemMeta?.revisionRejected === true) {
+        return 'revision_rejected';
+      }
       return expense.status;
     },
     [getExpenseRemainingAmount]
@@ -1481,6 +2026,18 @@ const ExpenseApproval: React.FC = () => {
         return <Chip label={t('expenseApproval.status.approved')} color="success" size="small" />;
       case 'rejected':
         return <Chip label={t('expenseApproval.status.rejected')} color="error" size="small" />;
+      case 'revision_rejected':
+        return (
+          <Chip label={t('expenseApproval.status.revisionRejected')} color="warning" size="small" />
+        );
+      case 'awaiting_tax':
+        return (
+          <Chip
+            label={t('expenseApproval.status.awaitingTaxInvoice')}
+            color="warning"
+            size="small"
+          />
+        );
       case 'paid':
         return <Chip label={t('expenseApproval.status.paid')} size="small" sx={paidStatusChipSx} />;
       default:
@@ -1495,6 +2052,11 @@ const ExpenseApproval: React.FC = () => {
     const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
     if (expense.bankTransferStatus === 'failed') {
       return <Chip label={t('expenseApproval.status.transferFailed')} color="error" size="small" />;
+    }
+    if (expenseIsAwaitingTaxInvoice(expense)) {
+      return (
+        <Chip label={t('expenseApproval.status.awaitingTaxInvoice')} color="warning" size="small" />
+      );
     }
     if (remaining <= 0 || expense.paymentRequestStatus === 'paid' || expense.status === 'paid') {
       return <Chip label={t('expenseApproval.status.paid')} size="small" sx={paidStatusChipSx} />;
@@ -1538,17 +2100,48 @@ const ExpenseApproval: React.FC = () => {
       dueDate: savedDueDate || todayDate,
       notes: expense.notes || ''
     });
-    const savedItems = (expense.items || []).map((item) => ({
-      id: item.id || `${Date.now()}-${Math.random()}`,
-      invoiceDate: formatLocalYmd(item.invoiceDate || item.date) || todayDate,
-      description: item.description || '',
-      qty: Number(item.qty || 1),
-      unitPrice: Number(item.unitPrice || item.amount || 0),
-      total: Number(item.total || item.amount || 0)
-    }));
-    setLineItems(savedItems.length > 0 ? savedItems : [createEmptyLineItem()]);
+    const savedItems = (expense.items || []).map((item) => {
+      const qty = Number(item.qty || 1);
+      const unitPrice = floorMoney(Number(item.unitPrice || item.amount || 0));
+      const formType = resolveExpenseFormType(meta);
+      if (formType === 'tds') {
+        const base = floorMoney(Number(item.amount ?? item.total ?? unitPrice));
+        const tdsRate = Number(item.tdsRate || 0);
+        const tdsInterest = floorMoney(Number(item.tdsInterest || 0));
+        const tdsAmt = floorMoney(
+          Number(item.tdsAmount ?? base * (tdsRate / 100))
+        );
+        return {
+          id: item.id || `${Date.now()}-${Math.random()}`,
+          invoiceDate: formatLocalYmd(item.invoiceDate || item.date) || todayDate,
+          description: item.description || '',
+          qty: 1,
+          unitPrice: base,
+          amount: base,
+          pan: item.pan || '',
+          tdsRate,
+          deducteeType: item.deducteeType === 'company' ? 'company' as const : 'other' as const,
+          tdsSection: item.tdsSection || '',
+          tdsCode: item.tdsCode || '',
+          tdsAmount: tdsAmt,
+          tdsInterest,
+          remarks: item.remarks || '',
+          total: floorMoney(Math.max(0, base - tdsAmt)),
+        };
+      }
+      return {
+        id: item.id || `${Date.now()}-${Math.random()}`,
+        invoiceDate: formatLocalYmd(item.invoiceDate || item.date) || todayDate,
+        description: item.description || '',
+        qty,
+        unitPrice,
+        total: floorMoney(Number(item.total || item.amount || qty * unitPrice)),
+      };
+    });
+    setLineItems(savedItems.length > 0 ? savedItems : [createEmptyLineItem(resolveExpenseFormType(meta))]);
     setCurrentAttachments(expense.attachments || []);
     setVoucherData({
+      formType: resolveExpenseFormType(meta),
       department: meta.department || linkedPartner?.company_name || '',
       partnerId: meta.partnerId != null ? String(meta.partnerId) : '',
       voucherNo: meta.voucherNo || '',
@@ -1596,10 +2189,11 @@ const ExpenseApproval: React.FC = () => {
       dueDate: todayDate,
       notes: ''
     });
-    setLineItems([createEmptyLineItem()]);
+    setLineItems([createEmptyLineItem('general')]);
     setCurrentAttachments([]);
     setPartnerInputValue('');
     setVoucherData({
+      formType: 'general',
       department: '',
       partnerId: '',
       voucherNo: '',
@@ -1628,10 +2222,12 @@ const ExpenseApproval: React.FC = () => {
     });
     setDraftId(null);
     setHeaderStatusBanner('');
+    lastSavedPayloadRef.current = '';
+    draftInitInFlightRef.current = false;
     setViewMode('create');
   };
 
-  const handleSaveExpense = async () => {
+  const handleSaveExpense = async (editReason?: string) => {
     if (!formData.title.trim() || !formData.purpose.trim()) {
       setError(t('expenseApproval.errors.requiredTitlePurpose'));
       return;
@@ -1653,33 +2249,87 @@ const ExpenseApproval: React.FC = () => {
       setError(t('expenseApproval.errors.draftNotReadyRetry'));
       return;
     }
+    const isRevisionResubmitEdit =
+      viewMode === 'edit' &&
+      selectedExpense != null &&
+      isRevisionRejectedExpense(selectedExpense);
+    if (isRevisionResubmitEdit && !String(editReason || '').trim()) {
+      setReasonDialogType('expense-edit');
+      setReasonTargetId(activeExpenseId);
+      setReasonText('');
+      setReasonDialogOpen(true);
+      return;
+    }
     setSaving(true);
     try {
-      const payload = buildExpensePayload('submitted');
+      const payload = {
+        ...buildExpensePayload('submitted'),
+        ...(isRevisionResubmitEdit && editReason?.trim() ? { edit_reason: editReason.trim() } : {}),
+      };
       const response = await accountingService.updateExpenseReport(activeExpenseId, payload);
       if (!response?.success) {
         throw new Error(response?.message || t('expenseApproval.errors.submitResponseFailed'));
       }
-      setSuccess(t('expenseApproval.success.submitted'));
+      setSuccess(
+        isRevisionResubmitEdit
+          ? t('expenseApproval.success.resubmittedAfterRevision')
+          : t('expenseApproval.success.submitted')
+      );
       await loadExpenseData();
       setViewMode('list');
       setSelectedExpense(null);
       setDraftId(null);
-    } catch (saveError) {
-      setError(t('expenseApproval.errors.submitFailed'));
+    } catch (saveError: any) {
+      const serverMsg = String(saveError?.response?.data?.message || saveError?.message || '').trim();
+      setError(serverMsg || t('expenseApproval.errors.submitFailed'));
     } finally {
       setSaving(false);
     }
   };
 
-  const createEmptyLineItem = (): ExpenseItem => ({
-    id: `${Date.now()}-${Math.random()}`,
-    invoiceDate: todayDate,
-    description: '',
-    qty: 1,
-    unitPrice: 0,
-    total: 0
-  });
+  const createEmptyLineItem = (formType: ExpenseFormType = voucherData.formType): ExpenseItem => {
+    if (formType === 'tds') {
+      return {
+        id: `${Date.now()}-${Math.random()}`,
+        invoiceDate: todayDate,
+        description: '',
+        qty: 1,
+        unitPrice: 0,
+        amount: 0,
+        pan: '',
+        tdsRate: 0,
+        deducteeType: 'other',
+        tdsSection: '',
+        tdsCode: '',
+        tdsAmount: 0,
+        tdsInterest: 0,
+        remarks: '',
+        total: 0,
+      };
+    }
+    return {
+      id: `${Date.now()}-${Math.random()}`,
+      invoiceDate: todayDate,
+      description: '',
+      qty: 1,
+      unitPrice: 0,
+      total: 0,
+    };
+  };
+
+  const handleChangeFormType = (next: ExpenseFormType) => {
+    if (next === voucherData.formType) return;
+    setVoucherData((prev) => ({
+      ...prev,
+      formType: next,
+      igstRate: next === 'gst' ? prev.igstRate : 0,
+      cgstRate: next === 'gst' ? prev.cgstRate : 0,
+      sgstRate: next === 'gst' ? prev.sgstRate : 0,
+      tdsEnabled: next === 'gst' ? prev.tdsEnabled : false,
+      tdsRate: next === 'gst' ? prev.tdsRate : 0,
+    }));
+    setLineItems([createEmptyLineItem(next)]);
+  };
 
   const handleAddLineItem = () => {
     setLineItems((prev) => [...prev, createEmptyLineItem()]);
@@ -1693,10 +2343,33 @@ const ExpenseApproval: React.FC = () => {
     setLineItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        const nextItem = { ...item, [field]: value };
+        const nextItem: ExpenseItem = { ...item, [field]: value };
+        if (voucherData.formType === 'tds') {
+          if (field === 'amount' || field === 'unitPrice') {
+            const base = floorMoney(Number(value || 0));
+            nextItem.amount = base;
+            nextItem.unitPrice = base;
+            nextItem.qty = 1;
+          }
+          if (field === 'tdsRate') {
+            nextItem.tdsRate = Number(value || 0);
+          }
+          if (field === 'tdsInterest') {
+            nextItem.tdsInterest = floorMoney(Number(value || 0));
+          }
+          const calc = calcTdsLineAmounts(nextItem);
+          nextItem.amount = calc.base;
+          nextItem.unitPrice = calc.base;
+          nextItem.tdsAmount = calc.tdsAmt;
+          nextItem.total = calc.payable;
+          return nextItem;
+        }
+        if (field === 'unitPrice') {
+          nextItem.unitPrice = floorMoney(Number(value || 0));
+        }
         const qty = Number(nextItem.qty || 0);
         const unitPrice = Number(nextItem.unitPrice || 0);
-        nextItem.total = Number((qty * unitPrice).toFixed(2));
+        nextItem.total = floorMoney(qty * unitPrice);
         return nextItem;
       })
     );
@@ -1772,7 +2445,7 @@ const ExpenseApproval: React.FC = () => {
       try {
         const response = await accountingService.getExpenseReport(activeExpenseId);
         if (cancelled || !response?.success) return;
-        const next = normalizeAttachmentPaths(response.data?.attachments);
+        const next = normalizeExpenseAttachments(response.data?.attachments);
         if (lastCount >= 0 && next.length > lastCount) {
           setSuccess(t('expenseApproval.success.receiptAttached'));
         }
@@ -1796,15 +2469,115 @@ const ExpenseApproval: React.FC = () => {
   }, [qrOpen, viewMode, selectedExpense?.id, draftId, t]);
 
   const openAttachment = (file: string) => {
-    if (isImageReceipt(file)) {
-      setPreviewAttachment(file);
-      return;
-    }
-    const url = getUploadUrl(file);
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    setPreviewLoadError(false);
+    setPreviewAttachment(file);
+    setPreviewDownloadName(getReceiptDisplayName(file));
   };
 
-  const renderAttachmentList = (files: string[]) => (
+  const closeAttachmentPreview = () => {
+    setPreviewAttachment(null);
+    setPreviewDownloadName('');
+    setPreviewBlobUrl('');
+    setPreviewLoading(false);
+    setPreviewLoadError(false);
+  };
+
+  const resolvePreviewDownloadName = useCallback(() => {
+    if (!previewAttachment) return 'download';
+    const original = getReceiptDisplayName(previewAttachment);
+    const ext = getFileExtension(original);
+    const draft = stripCorporateSuffixFromFilename(
+      String(previewDownloadName || '')
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
+    if (!draft) return original;
+    const withoutExt = draft.replace(/\.[^.]+$/, '').trim() || draft;
+    return ext ? `${withoutExt}.${ext}` : withoutExt;
+  }, [previewAttachment, previewDownloadName]);
+
+  useEffect(() => {
+    if (!previewAttachment || isImageReceipt(previewAttachment)) {
+      setPreviewBlobUrl('');
+      setPreviewLoading(false);
+      setPreviewLoadError(false);
+      return;
+    }
+
+    if (!isPdfReceipt(previewAttachment)) {
+      setPreviewBlobUrl('');
+      setPreviewLoading(false);
+      setPreviewLoadError(false);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl = '';
+    setPreviewLoading(true);
+    setPreviewLoadError(false);
+    setPreviewBlobUrl('');
+
+    void (async () => {
+      try {
+        const url = await fetchUploadObjectUrl(previewAttachment, {
+          forceMime: 'application/pdf',
+        });
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
+        setPreviewBlobUrl(url);
+      } catch {
+        if (!cancelled) {
+          setPreviewLoadError(true);
+          setPreviewBlobUrl('');
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewAttachment]);
+
+  const handleDeleteReceipt = async (file: ExpenseAttachment) => {
+    if (file.path.includes('expense-remittance-proofs')) return;
+    const activeExpenseId = viewMode === 'edit' ? selectedExpense?.id : draftId;
+    if (!activeExpenseId) {
+      setError(t('expenseApproval.errors.draftNotReady'));
+      return;
+    }
+    setDeletingReceiptPath(file.path);
+    try {
+      const response = await accountingService.deleteExpenseReceipt(activeExpenseId, file.path);
+      if (!response?.success) {
+        throw new Error(response?.message || t('expenseApproval.errors.receiptDeleteFailed'));
+      }
+      const next = normalizeExpenseAttachments(response.data?.attachments);
+      setCurrentAttachments(next);
+      setSelectedExpense((prev) =>
+        prev && prev.id === activeExpenseId ? { ...prev, attachments: next } : prev
+      );
+      setSuccess(t('expenseApproval.success.receiptDeleted'));
+    } catch (deleteError: any) {
+      setError(
+        String(deleteError?.response?.data?.message || deleteError?.message || '').trim() ||
+          t('expenseApproval.errors.receiptDeleteFailed')
+      );
+    } finally {
+      setDeletingReceiptPath(null);
+    }
+  };
+
+  const renderAttachmentList = (
+    files: ExpenseAttachment[] | string[],
+    options?: { deletable?: boolean; onDelete?: (file: ExpenseAttachment) => void }
+  ) => (
     <Box
       sx={{
         display: 'grid',
@@ -1813,33 +2586,83 @@ const ExpenseApproval: React.FC = () => {
         justifyContent: 'flex-start',
       }}
     >
-      {files.map((file, index) => {
-        const displayName = getReceiptDisplayName(file);
-        const image = isImageReceipt(file);
+      {normalizeExpenseAttachments(files).map((file, index) => {
+        const displayName = getReceiptDisplayName(file.path);
+        const image = isImageReceipt(file.path);
+        const typeLabel =
+          file.invoiceType === 'proforma'
+            ? t('expenseApproval.voucher.invoiceTypeProforma')
+            : t('expenseApproval.voucher.invoiceTypeTax');
+        const showTypeBadge = !file.path.includes('expense-remittance-proofs');
+        const canDelete =
+          Boolean(options?.deletable && options?.onDelete) &&
+          !file.path.includes('expense-remittance-proofs');
+        const isDeleting = deletingReceiptPath === file.path;
         return (
           <Box
-            key={`${file}-${index}`}
-            component="button"
-            type="button"
-            onClick={() => openAttachment(file)}
+            key={`${file.path}-${index}`}
             sx={{
-              all: 'unset',
-              cursor: 'pointer',
+              position: 'relative',
               display: 'flex',
               flexDirection: 'column',
               gap: 0.5,
               width: '100%',
               maxWidth: 110,
-              borderRadius: '8px',
-              transition: 'border-color 0.15s ease',
-              '&:hover': {
-                '& .receipt-thumb': {
-                  borderColor: 'primary.main' } },
-              '&:focus-visible': {
-                outline: '2px solid',
-                outlineColor: 'primary.main',
-                outlineOffset: 2 } }}
+            }}
           >
+            {canDelete ? (
+              <IconButton
+                size="small"
+                aria-label={t('expenseApproval.voucher.receiptDelete')}
+                disabled={Boolean(deletingReceiptPath)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void options?.onDelete?.(file);
+                }}
+                sx={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  zIndex: 2,
+                  width: 22,
+                  height: 22,
+                  bgcolor: 'rgba(255,255,255,0.92)',
+                  border: '1px solid #CBD5E1',
+                  '&:hover': { bgcolor: '#FEE2E2', borderColor: 'error.main' },
+                }}
+              >
+                {isDeleting ? (
+                  <CircularProgress size={12} />
+                ) : (
+                  <DeleteIcon sx={{ fontSize: 14, color: 'error.main' }} />
+                )}
+              </IconButton>
+            ) : null}
+            <Box
+              component="button"
+              type="button"
+              onClick={() => openAttachment(file.path)}
+              sx={{
+                all: 'unset',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.5,
+                width: '100%',
+                borderRadius: '8px',
+                transition: 'border-color 0.15s ease',
+                '&:hover': {
+                  '& .receipt-thumb': {
+                    borderColor: 'primary.main',
+                  },
+                },
+                '&:focus-visible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: 2,
+                },
+              }}
+            >
             <Box
               className="receipt-thumb"
               sx={{
@@ -1857,7 +2680,7 @@ const ExpenseApproval: React.FC = () => {
             >
               {image ? (
                 <AuthMedia
-                  src={file}
+                  src={file.path}
                   alt={displayName}
                   sx={{
                     width: '100%',
@@ -1868,10 +2691,29 @@ const ExpenseApproval: React.FC = () => {
               ) : (
                 <FileIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
               )}
+              {showTypeBadge ? (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    left: 4,
+                    top: 4,
+                    px: 0.5,
+                    py: 0.15,
+                    borderRadius: '2px',
+                    bgcolor: file.invoiceType === 'proforma' ? '#FEF3C7' : '#DCFCE7',
+                    color: file.invoiceType === 'proforma' ? '#92400E' : '#166534',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {typeLabel}
+                </Box>
+              ) : null}
             </Box>
             <Typography
               variant="caption"
-              title={displayName}
+              title={`${displayName} (${typeLabel})`}
               sx={{
                 px: 0.25,
                 fontWeight: 600,
@@ -1885,6 +2727,7 @@ const ExpenseApproval: React.FC = () => {
             >
               {displayName}
             </Typography>
+            </Box>
           </Box>
         );
       })}
@@ -1893,21 +2736,60 @@ const ExpenseApproval: React.FC = () => {
 
   const handleUploadReceipts = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const activeExpenseId = viewMode === 'edit' ? selectedExpense?.id : draftId;
+    if (!receiptInvoiceType) {
+      setError(t('expenseApproval.errors.invoiceTypeRequired'));
+      return;
+    }
+    const activeExpenseId = viewMode === 'edit' || viewMode === 'view' ? selectedExpense?.id : draftId;
     if (!activeExpenseId) {
       setError(t('expenseApproval.errors.draftNotReady'));
       return;
     }
     try {
       setUploadingReceipts(true);
-      const response = await accountingService.uploadExpenseReceiptById(activeExpenseId, Array.from(files));
+      const companyLabel =
+        String(voucherData.department || '').trim() ||
+        String(selectedExpense?.companyName || '').trim() ||
+        'Company';
+      const detailLabel =
+        String(formData.title || selectedExpense?.title || '').trim() ||
+        String(formData.purpose || selectedExpense?.purpose || '').trim() ||
+        String(lineItems[0]?.description || '').trim() ||
+        'PV';
+      const renamed = Array.from(files).map((file) => {
+        const ext = getFileExtension(file.name) || (file.type.includes('pdf') ? 'pdf' : 'jpg');
+        const nextName = buildDocumentDownloadFilename({
+          code: 'PV',
+          companyName: companyLabel,
+          detail: detailLabel,
+          extension: ext,
+        });
+        return renameFileKeepingExtension(file, nextName);
+      });
+      const response = await accountingService.uploadExpenseReceiptById(
+        activeExpenseId,
+        renamed,
+        receiptInvoiceType
+      );
       if (!response?.success) {
         throw new Error(response?.message || t('expenseApproval.errors.receiptUploadFailed'));
       }
-      setCurrentAttachments(normalizeAttachmentPaths(response.data?.attachments));
-      setSuccess(t('expenseApproval.success.receiptAttached'));
-    } catch (uploadError) {
-      setError(t('expenseApproval.errors.receiptUploadFailed'));
+      const next = normalizeExpenseAttachments(response.data?.attachments);
+      setCurrentAttachments(next);
+      if (selectedExpense && selectedExpense.id === activeExpenseId) {
+        setSelectedExpense({ ...selectedExpense, attachments: next });
+      }
+      setSuccess(
+        receiptInvoiceType === 'proforma'
+          ? t('expenseApproval.success.proformaAttached')
+          : t('expenseApproval.success.taxInvoiceAttached')
+      );
+    } catch (uploadError: any) {
+      setError(
+        uploadError?.response?.data?.message ||
+          uploadError?.message ||
+          t('expenseApproval.errors.receiptUploadFailed')
+      );
     } finally {
       setUploadingReceipts(false);
     }
@@ -1937,7 +2819,9 @@ const ExpenseApproval: React.FC = () => {
     accountingService.updateExpenseReportStatus(id, 'approved')
       .then(() => loadExpenseData())
       .then(() => {
-        setSelectedExpense((prev) => (prev && prev.id === id ? { ...prev, status: 'approved' } : prev));
+        setSelectedExpense(null);
+        setListTab('received');
+        setViewMode('list');
         setSuccess(t('expenseApproval.success.approved'));
       })
       .catch(() => {
@@ -1946,7 +2830,7 @@ const ExpenseApproval: React.FC = () => {
   };
 
   const handleRejectExpense = (id: number, reason: string) => {
-    accountingService.updateExpenseReportStatus(id, 'rejected', { reason })
+    accountingService.updateExpenseReportStatus(id, 'rejected', { reason, reject_kind: 'final' })
       .then(() => loadExpenseData())
       .then(() => {
         setSelectedExpense((prev) => {
@@ -1959,6 +2843,7 @@ const ExpenseApproval: React.FC = () => {
               rejectedReason: reason,
               rejectedById: user?.id,
               rejectedAt: new Date().toISOString(),
+              revisionRejected: false,
             },
           };
         });
@@ -1966,6 +2851,34 @@ const ExpenseApproval: React.FC = () => {
       })
       .catch(() => {
         setError(t('expenseApproval.errors.rejectFailed'));
+      });
+  };
+
+  const handleRevisionRejectExpense = (id: number, reason: string) => {
+    accountingService.updateExpenseReportStatus(id, 'rejected', { reason, reject_kind: 'revision' })
+      .then(() => loadExpenseData())
+      .then(() => {
+        setSelectedExpense((prev) => {
+          if (!prev || prev.id !== id) return prev;
+          return {
+            ...prev,
+            status: 'rejected',
+            itemMeta: {
+              ...(prev.itemMeta || {}),
+              revisionRejected: true,
+              revisionRejectReason: reason,
+              revisionRejectedById: user?.id,
+              revisionRejectedAt: new Date().toISOString(),
+              rejectedReason: reason,
+              rejectedById: user?.id,
+              rejectedAt: new Date().toISOString(),
+            },
+          };
+        });
+        setSuccess(t('expenseApproval.success.revisionRejected'));
+      })
+      .catch(() => {
+        setError(t('expenseApproval.errors.revisionRejectFailed'));
       });
   };
 
@@ -1996,9 +2909,25 @@ const ExpenseApproval: React.FC = () => {
     );
   };
 
+  const isExpensePaymentCompleted = (expense: ExpenseApprovalItem) => {
+    const remaining = getExpenseRemainingAmount(expense);
+    const paymentPaid = String(expense.paymentRequestStatus || '').toLowerCase() === 'paid';
+    return (
+      paymentPaid ||
+      expense.status === 'paid' ||
+      (Number(expense.paidAmount || 0) > 0 && remaining <= 0 && ['approved', 'paid'].includes(expense.status))
+    );
+  };
+
   const canUserApproveExpense = (expense: ExpenseApprovalItem) => {
     if (!isDesignatedApprover(expense)) return false;
     return ['submitted', 'in_review'].includes(expense.status);
+  };
+
+  const canUserRevisionRejectExpense = (expense: ExpenseApprovalItem) => {
+    if (!isDesignatedApprover(expense)) return false;
+    if (isExpensePaymentCompleted(expense)) return false;
+    return ['submitted', 'in_review', 'approved'].includes(expense.status);
   };
 
   const canChangeExpenseApprover = (expense: ExpenseApprovalItem) => {
@@ -2011,14 +2940,14 @@ const ExpenseApproval: React.FC = () => {
     if (!user?.id) return false;
     if (listTab === 'received' || listTab === 'transfer') return false;
     if (!isSameUserId(expense.requesterId, user.id)) return false;
-    return ['draft', 'rejected'].includes(expense.status);
+    return expense.status === 'draft' || isRevisionRejectedExpense(expense);
   };
 
   const canResubmitExpense = (expense: ExpenseApprovalItem) => {
     if (!user?.id) return false;
     if (listTab === 'received' || listTab === 'transfer') return false;
     if (!isSameUserId(expense.requesterId, user.id)) return false;
-    return expense.status === 'rejected';
+    return expense.status === 'rejected' && !isRevisionRejectedExpense(expense);
   };
 
   const canDeleteExpense = (expense: ExpenseApprovalItem) => {
@@ -2037,7 +2966,10 @@ const ExpenseApproval: React.FC = () => {
     [companyGstNumber, companyGstState]
   );
 
-  const openReasonDialog = (type: 'payment-approve' | 'payment-reject' | 'expense-reject', id: number) => {
+  const openReasonDialog = (
+    type: 'payment-approve' | 'payment-reject' | 'expense-reject' | 'expense-revision-reject',
+    id: number
+  ) => {
     setReasonDialogType(type);
     setReasonTargetId(id);
     setReasonText('');
@@ -2066,6 +2998,7 @@ const ExpenseApproval: React.FC = () => {
   const setRemittanceProofFile = useCallback((file: File | null) => {
     if (!file) {
       setPaymentProofFile(null);
+      setProofNameDraft('');
       return;
     }
     const meta = selectedExpense?.itemMeta || {};
@@ -2080,7 +3013,17 @@ const ExpenseApproval: React.FC = () => {
       { type: file.type, lastModified: file.lastModified }
     );
     setPaymentProofFile(named);
+    setProofNameDraft(named.name);
   }, [partners, selectedExpense]);
+
+  const applyProofFileName = useCallback((nextName: string) => {
+    setPaymentProofFile((prev) => {
+      if (!prev) return prev;
+      const renamed = renameFileKeepingExtension(prev, nextName);
+      setProofNameDraft(renamed.name);
+      return renamed;
+    });
+  }, []);
 
   useEffect(() => {
     if (!paymentProofFile || !paymentProofFile.type.startsWith('image/')) {
@@ -2118,6 +3061,7 @@ const ExpenseApproval: React.FC = () => {
     const remaining = getExpenseRemainingAmount(selectedExpense);
     setPaymentAmountInput(remaining > 0 ? String(remaining) : String(selectedExpense.totalAmount || ''));
     setRemittanceProofFile(null);
+    setProofNameDraft('');
     setPaymentDialogOpen(true);
   };
 
@@ -2133,28 +3077,34 @@ const ExpenseApproval: React.FC = () => {
         throw new Error(response?.message || t('expenseApproval.errors.paymentCompleteFailed'));
       }
       await loadExpenseData();
-      if (response?.data) {
-        setSelectedExpense(mapExpense(response.data));
-      } else {
-        setSelectedExpense((prev) => {
-          if (!prev || prev.id !== id) return prev;
-          const remaining = Number(response?.remaining_amount);
-          const fullyPaid = Number.isFinite(remaining) ? remaining <= 0 : true;
-          return {
-            ...prev,
-            paidAmount: Number(response?.paid_amount ?? prev.paidAmount),
-            paymentRequestStatus: fullyPaid ? 'paid' : 'approved',
-            status: fullyPaid ? 'paid' : prev.status,
-          };
-        });
-      }
       setPaymentDialogOpen(false);
       setRemittanceProofFile(null);
       const remaining = Number(response?.remaining_amount);
-      if (Number.isFinite(remaining) && remaining > 0) {
+      if (response?.awaiting_tax_invoice) {
+        setSuccess(t('expenseApproval.success.remittanceAwaitingTax'));
+        if (response?.data) {
+          setSelectedExpense(mapExpense(response.data));
+        }
+        setViewMode('view');
+      } else if (Number.isFinite(remaining) && remaining > 0) {
         setSuccess(t('expenseApproval.success.partialPaymentCompleted', { remaining }));
+        if (response?.data) {
+          setSelectedExpense(mapExpense(response.data));
+        } else {
+          setSelectedExpense((prev) => {
+            if (!prev || prev.id !== id) return prev;
+            return {
+              ...prev,
+              paidAmount: Number(response?.paid_amount ?? prev.paidAmount),
+              paymentRequestStatus: 'approved',
+            };
+          });
+        }
       } else {
-        setSuccess(t('expenseApproval.success.paymentCompleted'));
+      setSuccess(t('expenseApproval.success.paymentCompleted'));
+        setSelectedExpense(null);
+        setListTab('transfer');
+        setViewMode('list');
       }
     } catch (err: any) {
       setError(
@@ -2183,7 +3133,12 @@ const ExpenseApproval: React.FC = () => {
       setError(t('expenseApproval.errors.remittanceProofRequired'));
       return;
     }
-    await handleCompletePayment(selectedExpense.id, amount, paymentProofFile);
+    const proofToSend = renameFileKeepingExtension(paymentProofFile, proofNameDraft);
+    if (proofToSend.name !== paymentProofFile.name) {
+      setPaymentProofFile(proofToSend);
+      setProofNameDraft(proofToSend.name);
+    }
+    await handleCompletePayment(selectedExpense.id, amount, proofToSend);
   };
 
   const handleApprovePayment = async (id: number, reason?: string) => {
@@ -2214,19 +3169,39 @@ const ExpenseApproval: React.FC = () => {
 
   const handleReasonSubmit = async () => {
     if (!reasonTargetId) return;
-    if ((reasonDialogType === 'payment-reject' || reasonDialogType === 'expense-reject') && !reasonText.trim()) {
-      setError(t('expenseApproval.errors.rejectReasonRequired'));
+    if (
+      (reasonDialogType === 'payment-reject' ||
+        reasonDialogType === 'expense-reject' ||
+        reasonDialogType === 'expense-revision-reject' ||
+        reasonDialogType === 'expense-edit') &&
+      !reasonText.trim()
+    ) {
+      setError(
+        reasonDialogType === 'expense-edit'
+          ? t('expenseApproval.errors.editReasonRequired')
+          : reasonDialogType === 'expense-revision-reject'
+            ? t('expenseApproval.errors.revisionRejectReasonRequired')
+            : t('expenseApproval.errors.rejectReasonRequired')
+      );
       return;
     }
     const reason = reasonText.trim();
     if (reasonDialogType === 'payment-approve') {
       await handleApprovePayment(reasonTargetId, reason || undefined);
+      closeReasonDialog();
     } else if (reasonDialogType === 'payment-reject') {
       await handleRejectPayment(reasonTargetId, reason || undefined);
+      closeReasonDialog();
+    } else if (reasonDialogType === 'expense-edit') {
+      closeReasonDialog();
+      await handleSaveExpense(reason);
+    } else if (reasonDialogType === 'expense-revision-reject') {
+      handleRevisionRejectExpense(reasonTargetId, reason);
+      closeReasonDialog();
     } else {
       handleRejectExpense(reasonTargetId, reason);
+      closeReasonDialog();
     }
-    closeReasonDialog();
   };
 
   const getUserNameById = (id?: number) => {
@@ -2347,10 +3322,16 @@ const ExpenseApproval: React.FC = () => {
     setPdfDownloading(true);
     try {
       const meta = selectedExpense.itemMeta || {};
-      const filename = buildExpenseApprovalPdfFilename(
-        meta.voucherNo || selectedExpense.expenseId,
-        selectedExpense.title
-      );
+      const filename = buildExpenseApprovalPdfFilename({
+        companyName:
+          companyName ||
+          selectedExpense.companyName ||
+          selectedExpense.itemMeta?.department ||
+          '',
+        detail: selectedExpense.title || meta.voucherNo || selectedExpense.expenseId,
+        voucherNo: meta.voucherNo || selectedExpense.expenseId,
+        title: selectedExpense.title,
+      });
       await downloadExpenseApprovalPdf(root, filename);
       setSuccess(t('expenseApproval.success.pdfDownloaded'));
     } catch (pdfError: any) {
@@ -2451,52 +3432,127 @@ const ExpenseApproval: React.FC = () => {
   const attachmentPreviewDialog = (
     <Dialog
       open={Boolean(previewAttachment)}
-      onClose={() => setPreviewAttachment(null)}
-      maxWidth="md"
+      onClose={closeAttachmentPreview}
+      maxWidth="lg"
       fullWidth
+      sx={{ zIndex: (theme) => theme.zIndex.modal + 2 }}
     >
-      <DialogTitle sx={{ pr: 6 }}>
-        {previewAttachment ? getReceiptDisplayName(previewAttachment) : ''}
+      <DialogTitle sx={{ pr: 2, pb: 1.25 }}>
+        <TextField
+          size="small"
+          fullWidth
+          label={t('expenseApproval.detail.attachmentFileName')}
+          value={previewDownloadName}
+          onChange={(e) =>
+            setPreviewDownloadName(stripCorporateSuffixFromFilename(e.target.value))
+          }
+          onFocus={(e) => e.target.select()}
+          onBlur={() => setPreviewDownloadName(resolvePreviewDownloadName())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              (e.target as HTMLInputElement).blur();
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              if (previewAttachment) {
+                setPreviewDownloadName(getReceiptDisplayName(previewAttachment));
+              }
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          helperText={t('expenseApproval.detail.attachmentFileNameHint')}
+          InputProps={{ sx: { fontWeight: 600 } }}
+        />
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ p: 0, bgcolor: '#F1F5F9', minHeight: { xs: 320, sm: 480 } }}>
         {previewAttachment && isImageReceipt(previewAttachment) ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', bgcolor: '#F1F5F9', borderRadius: 1, p: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
             <AuthMedia
               src={previewAttachment}
-              alt={getReceiptDisplayName(previewAttachment)}
-              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+              alt={previewDownloadName || getReceiptDisplayName(previewAttachment)}
+              sx={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain' }}
             />
           </Box>
-        ) : null}
+        ) : previewLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 360 }}>
+            <CircularProgress size={32} />
+          </Box>
+        ) : previewAttachment && isPdfReceipt(previewAttachment) && previewBlobUrl ? (
+          <Box
+            sx={{
+              position: 'relative',
+              width: '100%',
+              height: { xs: '60vh', sm: '75vh' },
+              bgcolor: '#fff',
+            }}
+          >
+            <Box
+              component="iframe"
+              title={previewDownloadName || getReceiptDisplayName(previewAttachment)}
+              src={`${previewBlobUrl}#toolbar=1&navpanes=0`}
+              sx={{
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                border: 0,
+                bgcolor: '#fff',
+              }}
+            />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              minHeight: 280,
+              px: 2,
+              textAlign: 'center',
+            }}
+          >
+            <FileIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.secondary">
+              {previewLoadError
+                ? t('expenseApproval.errors.attachmentPreviewFailed', {
+                    defaultValue: '미리보기를 불러오지 못했습니다. 다운로드하거나 새 탭에서 열어 주세요.',
+                  })
+                : t('expenseApproval.detail.attachmentPreviewUnavailable', {
+                    defaultValue: '이 파일 형식은 미리보기를 지원하지 않습니다. 다운로드하거나 새 탭에서 열어 주세요.',
+                  })}
+            </Typography>
+          </Box>
+        )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ px: 2, py: 1.5, gap: 1, flexWrap: 'wrap' }}>
         {previewAttachment ? (
           <>
-            {isImageReceipt(previewAttachment) && (
-              <Button
-                variant="outlined"
-                startIcon={<DownloadIcon fontSize="small" />}
-                onClick={() => {
-                  void downloadUploadFile(previewAttachment, getReceiptDisplayName(previewAttachment));
-                }}
-                sx={hvoBodyOutlinedBtnSx}
-              >
-                {t('common.download')}
-              </Button>
-            )}
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon fontSize="small" />}
+              onClick={() => {
+                void downloadUploadFile(previewAttachment, resolvePreviewDownloadName());
+              }}
+              sx={hvoBodyOutlinedBtnSx}
+            >
+              {t('common.download')}
+            </Button>
             <Button
               variant="outlined"
               startIcon={<OpenInNewIcon fontSize="small" />}
-              href={getUploadUrl(previewAttachment)}
-              target="_blank"
-              rel="noreferrer"
+              onClick={() => {
+                const url = previewBlobUrl || getUploadUrl(previewAttachment);
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+              }}
               sx={hvoBodyOutlinedBtnSx}
             >
-              {t('common.openInNew', { defaultValue: '새 탭에서 열기' })}
+              {t('common.openInNew')}
             </Button>
           </>
         ) : null}
-        <Button onClick={() => setPreviewAttachment(null)} sx={hvoBodyOutlinedBtnSx}>
+        <Button onClick={closeAttachmentPreview} sx={hvoBodyOutlinedBtnSx}>
           {t('common.close')}
         </Button>
       </DialogActions>
@@ -2520,32 +3576,36 @@ const ExpenseApproval: React.FC = () => {
 
   if (viewMode === 'create' || viewMode === 'edit') {
     const isEdit = viewMode === 'edit';
+    const isRevisionResubmitEdit =
+      isEdit &&
+      selectedExpense != null &&
+      isRevisionRejectedExpense(selectedExpense);
     return (
       <Box sx={{ ...hvoPageRootSx }}>
         <HvoPageHeader
           title={isEdit ? t('expenseApproval.form.editTitle') : t('expenseApproval.form.createTitle')}
           mb={2}
           actions={
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              {headerStatusBanner === 'draftCreated' && (
-                <Typography variant="body2" color="text.secondary">
-                  {t('expenseApproval.success.draftCreated')}
-                </Typography>
-              )}
-              {headerStatusBanner === 'autoSaved' && (
-                <Typography variant="body2" color="text.secondary">
-                  {t('expenseApproval.voucher.autoSaveSaved')}
-                </Typography>
-              )}
-              {headerStatusBanner === 'autoSaveFailed' && (
-                <Typography variant="body2" color="error">
-                  {t('expenseApproval.voucher.autoSaveFailed')}
-                </Typography>
-              )}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {headerStatusBanner === 'draftCreated' && (
+              <Typography variant="body2" color="text.secondary">
+                {t('expenseApproval.success.draftCreated')}
+              </Typography>
+            )}
+            {headerStatusBanner === 'autoSaved' && (
+              <Typography variant="body2" color="text.secondary">
+                {t('expenseApproval.voucher.autoSaveSaved')}
+              </Typography>
+            )}
+            {headerStatusBanner === 'autoSaveFailed' && (
+              <Typography variant="body2" color="error">
+                {t('expenseApproval.voucher.autoSaveFailed')}
+              </Typography>
+            )}
               <Button variant="outlined" onClick={() => setViewMode('list')} sx={hvoBodyOutlinedBtnSx}>
-                {t('expenseApproval.actions.backToList')}
-              </Button>
-            </Box>
+              {t('expenseApproval.actions.backToList')}
+            </Button>
+          </Box>
           }
         />
 
@@ -2566,16 +3626,6 @@ const ExpenseApproval: React.FC = () => {
               >
                 <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   <Box>
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: '0.9375rem',
-                        color: '#0F172A',
-                        mb: companyLogo || companyName ? 0.5 : 0,
-                      }}
-                    >
-                      {isEdit ? t('expenseApproval.form.editTitle') : t('expenseApproval.form.createTitle')}
-                    </Typography>
                     <ExpenseCompanyBlock
                       logo={companyLogo}
                       logoAlt={t('expenseApproval.voucher.companyLogoAlt')}
@@ -2616,9 +3666,9 @@ const ExpenseApproval: React.FC = () => {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem', color: EXPENSE_STAMP_LABEL }}>
-                        {t('expenseApproval.voucher.prepared')}
-                      </Typography>
-                    </Box>
+                    {t('expenseApproval.voucher.prepared')}
+                  </Typography>
+                </Box>
                     <Box
                       sx={{
                         minHeight: 68,
@@ -2648,8 +3698,8 @@ const ExpenseApproval: React.FC = () => {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem', color: EXPENSE_STAMP_LABEL }}>
-                        {t('expenseApproval.voucher.approved')}
-                      </Typography>
+                    {t('expenseApproval.voucher.approved')}
+                  </Typography>
                     </Box>
                     <Box
                       sx={{
@@ -2661,11 +3711,11 @@ const ExpenseApproval: React.FC = () => {
                         py: 0.5,
                       }}
                     >
-                      <Autocomplete
+                  <Autocomplete
                         fullWidth
                         size="small"
                         options={selectableApprovers}
-                        getOptionLabel={(option) => option.name}
+                    getOptionLabel={(option) => option.name}
                         isOptionEqualToValue={(a, b) => Number(a.id) === Number(b.id)}
                         value={
                           selectableApprovers.find((item) => String(item.id) === String(voucherData.approvedById))
@@ -2679,7 +3729,7 @@ const ExpenseApproval: React.FC = () => {
                           }
                           setVoucherData({ ...voucherData, approvedById: value ? String(value.id) : '' });
                         }}
-                        renderInput={(params) => (
+                    renderInput={(params) => (
                           <TextField
                             {...params}
                             placeholder={t('expenseApproval.placeholders.searchSimple')}
@@ -2708,26 +3758,54 @@ const ExpenseApproval: React.FC = () => {
 
             <CardContent sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, bgcolor: '#FFFFFF' }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-            {/* 지출 신청 */}
             <Box
               sx={{
-                ...sectionBlockSx,
-                borderLeft: `3px solid ${EXPENSE_REQUEST_ACCENT}`,
-                bgcolor: EXPENSE_REQUEST_BG,
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: 1,
+                px: 0.25,
               }}
             >
-              <Box sx={{ ...sectionHeaderBarSx, bgcolor: EXPENSE_MUTED_BG }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.8125rem', color: EXPENSE_REQUEST_ACCENT }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, mr: 0.5 }}>
+                {t('expenseApproval.voucher.formTypeLabel')}
+              </Typography>
+              <RadioGroup
+                row
+                value={voucherData.formType}
+                onChange={(e) => handleChangeFormType(e.target.value as ExpenseFormType)}
+                sx={{ gap: { xs: 0, sm: 1 } }}
+              >
+                <FormControlLabel
+                  value="general"
+                  control={<Radio size="small" />}
+                  label={t('expenseApproval.voucher.formTypeGeneral')}
+                />
+                <FormControlLabel
+                  value="gst"
+                  control={<Radio size="small" />}
+                  label={t('expenseApproval.voucher.formTypeGst')}
+                />
+                <FormControlLabel
+                  value="tds"
+                  control={<Radio size="small" />}
+                  label={t('expenseApproval.voucher.formTypeTds')}
+                />
+              </RadioGroup>
+            </Box>
+            {/* 지출 신청 */}
+            <Box>
+              <Typography variant="subtitle2" sx={sectionTitleSx}>
                   {t('expenseApproval.voucher.sectionRequest')}
-                </Typography>
-              </Box>
+              </Typography>
+              <Box sx={sectionBlockSx}>
               <TableContainer>
                 <Table size="small" sx={compactTableSx}>
                   <TableBody>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.columns.requester')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.columns.requester')}</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{user?.username || '-'}</TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.departmentRole')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.departmentRole')}</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>
                         {[user?.department, user?.position]
                           .filter((v) => v && String(v).trim() && String(v).trim() !== '-')
@@ -2741,71 +3819,70 @@ const ExpenseApproval: React.FC = () => {
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1 }}>
                   <Box sx={{ gridColumn: { md: '1 / -1' } }}>
-                    <TextField
-                      label={t('expenseApproval.voucher.labelTitle')}
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      required
-                      fullWidth
-                      size="small"
-                      sx={softFieldSx}
-                    />
-                  </Box>
-                  <Box sx={{ gridColumn: { md: '1 / -1' } }}>
-                    <TextField
-                      label={t('expenseApproval.voucher.labelPurpose')}
-                      value={formData.purpose}
-                      onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                      required
-                      fullWidth
-                      size="small"
-                      multiline
-                      minRows={2}
-                      sx={softFieldSx}
-                    />
-                  </Box>
-                  <FormControl fullWidth size="small" sx={softFieldSx}>
-                    <InputLabel>{t('expenseApproval.filters.priority')}</InputLabel>
-                    <Select
-                      label={t('expenseApproval.filters.priority')}
-                      value={formData.priority}
-                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent' })}
-                    >
-                      <MenuItem value="low">{t('expenseApproval.priority.low')}</MenuItem>
-                      <MenuItem value="medium">{t('expenseApproval.priority.medium')}</MenuItem>
-                      <MenuItem value="high">{t('expenseApproval.priority.high')}</MenuItem>
-                      <MenuItem value="urgent">{t('expenseApproval.priority.urgent')}</MenuItem>
-                    </Select>
-                  </FormControl>
                   <TextField
-                    label={t('expenseApproval.voucher.labelDateCreated')}
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    InputLabelProps={{ shrink: true }}
+                      label={t('expenseApproval.voucher.labelTitle')}
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required
                     fullWidth
-                    size="small"
-                    inputProps={{ lang: formLangAttr }}
-                    sx={softFieldSx}
+                      size="small"
+                      sx={softFieldSx}
                   />
                 </Box>
+                  <Box sx={{ gridColumn: { md: '1 / -1' } }}>
+                  <TextField
+                      label={t('expenseApproval.voucher.labelPurpose')}
+                    value={formData.purpose}
+                    onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                    required
+                    fullWidth
+                      size="small"
+                    multiline
+                    minRows={2}
+                      sx={softFieldSx}
+                  />
+                </Box>
+                  <FormControl fullWidth size="small" sx={softFieldSx}>
+                    <InputLabel>{t('expenseApproval.filters.priority')}</InputLabel>
+                      <Select
+                      label={t('expenseApproval.filters.priority')}
+                        value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent' })}
+                      >
+                        <MenuItem value="low">{t('expenseApproval.priority.low')}</MenuItem>
+                        <MenuItem value="medium">{t('expenseApproval.priority.medium')}</MenuItem>
+                        <MenuItem value="high">{t('expenseApproval.priority.high')}</MenuItem>
+                        <MenuItem value="urgent">{t('expenseApproval.priority.urgent')}</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                    label={t('expenseApproval.voucher.labelDateCreated')}
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                    size="small"
+                      inputProps={{ lang: formLangAttr }}
+                    sx={softFieldSx}
+                    />
+                </Box>
+              </Box>
               </Box>
             </Box>
 
             {/* 대금을 받는 협력업체 */}
-            <Box
+            <Box>
+              <Typography variant="subtitle2" sx={sectionTitleSx}>
+                {t('expenseApproval.voucher.sectionVendor')}
+              </Typography>
+              <Box
               sx={{
                 ...sectionBlockSx,
                 border: `1px solid ${EXPENSE_VENDOR_LINE}`,
-                borderLeft: `3px solid ${EXPENSE_VENDOR_ACCENT}`,
                 bgcolor: EXPENSE_VENDOR_BG,
               }}
             >
-              <Box sx={{ ...sectionHeaderBarSx, bgcolor: EXPENSE_VENDOR_HEADER, borderBottomColor: EXPENSE_VENDOR_LINE }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.8125rem', color: EXPENSE_VENDOR_ACCENT }}>
-                  {t('expenseApproval.voucher.sectionVendor')}
-                </Typography>
-              </Box>
               <Box sx={{ p: 1.25 }}>
               <Typography
                 variant="caption"
@@ -2814,10 +3891,10 @@ const ExpenseApproval: React.FC = () => {
                 {t('expenseApproval.voucher.vendorGroupDoc')}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1, mb: 1.25 }}>
-                <Autocomplete
+                  <Autocomplete
                   sx={softFieldSx}
                   fullWidth
-                  options={partners}
+                    options={partners}
                   filterOptions={filterPartnerOptions}
                   getOptionLabel={(option) => option.company_name || ''}
                   isOptionEqualToValue={(a, b) => Number(a.id) === Number(b.id)}
@@ -2825,52 +3902,60 @@ const ExpenseApproval: React.FC = () => {
                   clearOnBlur={false}
                   selectOnFocus
                   handleHomeEndKeys
-                  noOptionsText={t('partners.empty.noResults')}
-                  value={partners.find((item) => String(item.id) === String(voucherData.partnerId)) || null}
+                  noOptionsText={
+                    partnerLoadError
+                      ? t('expenseApproval.voucher.partnerLoadFailed')
+                      : partnerScopeEnforced && partners.length === 0
+                        ? t('expenseApproval.voucher.partnerScopeEmpty')
+                        : partnerScopeEnforced
+                          ? t('expenseApproval.voucher.partnerScopeNoMatch')
+                          : t('partnerManagement.empty.noResults')
+                  }
+                    value={partners.find((item) => String(item.id) === String(voucherData.partnerId)) || null}
                   inputValue={partnerInputValue}
                   onInputChange={(_, newInput) => setPartnerInputValue(newInput)}
-                  onChange={(_, value) => {
-                    if (!value) {
+                    onChange={(_, value) => {
+                      if (!value) {
                       setPartnerInputValue('');
-                      setVoucherData({
-                        ...voucherData,
-                        partnerId: '',
-                        department: '',
-                        gstNumber: '',
+                        setVoucherData({
+                          ...voucherData,
+                          partnerId: '',
+                          department: '',
+                          gstNumber: '',
                         partnerRepresentative: '',
                         partnerAddress: '',
                         partnerPhone: '',
                         partnerEmail: '',
                         partnerPan: '',
-                        bank: '',
-                        accountNumber: '',
-                        ifsc: '',
+                          bank: '',
+                          accountNumber: '',
+                          ifsc: '',
                         acHolder: '',
                         igstRate: 0,
                         cgstRate: 0,
                         sgstRate: 0,
-                      });
-                      return;
-                    }
+                        });
+                        return;
+                      }
                     setPartnerInputValue(value.company_name || '');
                     const gstNumber = pickPartnerGstNumber(value);
-                    setVoucherData({
-                      ...voucherData,
-                      partnerId: String(value.id),
-                      department: value.company_name || '',
-                      gstNumber,
+                      setVoucherData({
+                        ...voucherData,
+                        partnerId: String(value.id),
+                        department: value.company_name || '',
+                        gstNumber,
                       partnerRepresentative: value.representative || '',
                       partnerAddress: value.address || '',
                       partnerPhone: value.phone || '',
                       partnerEmail: value.email || '',
                       partnerPan: value.pan_number || '',
-                      bank: value.bank_name || '',
-                      accountNumber: value.account_number || '',
-                      ifsc: value.bank_ifsc || '',
+                        bank: value.bank_name || '',
+                        accountNumber: value.account_number || '',
+                        ifsc: value.bank_ifsc || '',
                       acHolder: value.account_holder || value.representative || value.company_name || '',
                       ...resolveGstRatesFromGstin(gstNumber, companyGstNumber, companyGstState),
-                    });
-                  }}
+                      });
+                    }}
                   renderOption={(props, option) => (
                     <li {...props} key={option.id}>
                       <Box sx={{ minWidth: 0, py: 0.25 }}>
@@ -2885,7 +3970,7 @@ const ExpenseApproval: React.FC = () => {
                       </Box>
                     </li>
                   )}
-                  renderInput={(params) => (
+                    renderInput={(params) => (
                     <TextField
                       {...params}
                       label={t('expenseApproval.voucher.labelPartner')}
@@ -2894,18 +3979,18 @@ const ExpenseApproval: React.FC = () => {
                     />
                   )}
                 />
-                <TextField
+                  <TextField
                   label={t('expenseApproval.voucher.labelVoucherNumber')}
-                  value={voucherData.voucherNo}
+                    value={voucherData.voucherNo}
                   placeholder={t('expenseApproval.voucher.autoGenerated')}
-                  fullWidth
+                    fullWidth
                   size="small"
                   InputProps={{ readOnly: true }}
                   sx={softFieldSx}
-                />
-                <TextField
+                  />
+                  <TextField
                   label={t('expenseApproval.voucher.labelGstNumber')}
-                  value={voucherData.gstNumber}
+                    value={voucherData.gstNumber}
                   onChange={(e) => {
                     const gstNumber = e.target.value;
                     setVoucherData({
@@ -2914,19 +3999,19 @@ const ExpenseApproval: React.FC = () => {
                       ...resolveGstRatesFromGstin(gstNumber, companyGstNumber, companyGstState),
                     });
                   }}
-                  fullWidth
+                    fullWidth
                   size="small"
                   sx={softFieldSx}
-                />
-                <TextField
+                  />
+                  <TextField
                   label={t('expenseApproval.voucher.labelVoucherDate')}
-                  type="date"
-                  value={voucherData.voucherDate}
-                  onChange={(e) => setVoucherData({ ...voucherData, voucherDate: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
+                    type="date"
+                    value={voucherData.voucherDate}
+                    onChange={(e) => setVoucherData({ ...voucherData, voucherDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
                   size="small"
-                  inputProps={{ lang: formLangAttr }}
+                    inputProps={{ lang: formLangAttr }}
                   sx={softFieldSx}
                 />
                 <TextField
@@ -2961,7 +4046,15 @@ const ExpenseApproval: React.FC = () => {
                   size="small"
                   sx={softFieldSx}
                 />
-              </Box>
+                <TextField
+                  label={t('expenseApproval.voucher.labelPartnerAddress')}
+                  value={formatEnglishSentenceLabel(voucherData.partnerAddress)}
+                  onChange={(e) => setVoucherData({ ...voucherData, partnerAddress: e.target.value })}
+                  fullWidth
+                  size="small"
+                  sx={{ ...softFieldSx, gridColumn: { md: '1 / -1' } }}
+                />
+                </Box>
               <Typography
                 variant="caption"
                 sx={{ fontWeight: 600, display: 'block', mb: 0.75, color: EXPENSE_VENDOR_SUB }}
@@ -2969,46 +4062,39 @@ const ExpenseApproval: React.FC = () => {
                 {t('expenseApproval.voucher.vendorGroupPayout')}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1 }}>
-                <TextField
+                  <TextField
                   label={t('expenseApproval.voucher.labelAccountHolder')}
-                  value={voucherData.acHolder}
-                  onChange={(e) => setVoucherData({ ...voucherData, acHolder: e.target.value })}
-                  fullWidth
+                    value={voucherData.acHolder}
+                    onChange={(e) => setVoucherData({ ...voucherData, acHolder: e.target.value })}
+                    fullWidth
                   size="small"
                   sx={softFieldSx}
-                />
-                <TextField
+                  />
+                  <TextField
                   label={t('expenseApproval.voucher.labelBankName')}
-                  value={voucherData.bank}
-                  onChange={(e) => setVoucherData({ ...voucherData, bank: e.target.value })}
-                  fullWidth
+                    value={voucherData.bank}
+                    onChange={(e) => setVoucherData({ ...voucherData, bank: e.target.value })}
+                    fullWidth
                   size="small"
                   sx={softFieldSx}
-                />
-                <TextField
+                  />
+                  <TextField
                   label={t('expenseApproval.voucher.labelAccountNumber')}
-                  value={voucherData.accountNumber}
-                  onChange={(e) => setVoucherData({ ...voucherData, accountNumber: e.target.value })}
-                  fullWidth
+                    value={voucherData.accountNumber}
+                    onChange={(e) => setVoucherData({ ...voucherData, accountNumber: e.target.value })}
+                    fullWidth
                   size="small"
                   sx={softFieldSx}
-                />
-                <TextField
+                  />
+                  <TextField
                   label={t('expenseApproval.voucher.labelIfsc')}
-                  value={voucherData.ifsc}
-                  onChange={(e) => setVoucherData({ ...voucherData, ifsc: e.target.value })}
-                  fullWidth
+                    value={voucherData.ifsc}
+                    onChange={(e) => setVoucherData({ ...voucherData, ifsc: e.target.value })}
+                    fullWidth
                   size="small"
                   sx={softFieldSx}
                 />
-                <TextField
-                  label={t('expenseApproval.voucher.labelPartnerAddress')}
-                  value={voucherData.partnerAddress}
-                  onChange={(e) => setVoucherData({ ...voucherData, partnerAddress: e.target.value })}
-                  fullWidth
-                  size="small"
-                  sx={{ ...softFieldSx, gridColumn: { md: '1 / -1' } }}
-                />
+                </Box>
               </Box>
               </Box>
             </Box>
@@ -3105,7 +4191,7 @@ const ExpenseApproval: React.FC = () => {
                           onChange={(e) => handleUpdateLineItem(item.id, 'unitPrice', Number(e.target.value || 0))}
                           onKeyDown={handleLineItemKeyDown(item.id, 'unitPrice', index)}
                           size="small"
-                          inputProps={{ min: 0 }}
+                          inputProps={{ min: 0, step: 1 }}
                           fullWidth
                           placeholder={t('expenseApproval.voucher.placeholderUnitPrice')}
                           inputRef={setInputRef(item.id, 'unitPrice')}
@@ -3141,9 +4227,12 @@ const ExpenseApproval: React.FC = () => {
             </Box>
 
             <Box
+              className="expense-pdf-tax"
               sx={{
                 mb: 1,
-                width: { xs: '100%', sm: '25%' },
+                width: { xs: '100%', sm: `${EXPENSE_TAX_BOX_WIDTH_PERCENT}%` },
+                minWidth: { xs: '100%', sm: EXPENSE_TAX_BOX_WIDTH_PX },
+                maxWidth: '100%',
                 ml: { xs: 0, sm: 'auto' },
                 borderRadius: '4px',
                 p: { xs: 1, sm: 1.25 },
@@ -3355,6 +4444,26 @@ const ExpenseApproval: React.FC = () => {
               <Typography variant="subtitle2" sx={sectionTitleSx}>
                 {t('expenseApproval.voucher.sectionReceipts')}
               </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                {t('expenseApproval.voucher.invoiceTypeHint')}
+              </Typography>
+              <RadioGroup
+                row
+                value={receiptInvoiceType}
+                onChange={(e) => setReceiptInvoiceType(e.target.value as ExpenseInvoiceType)}
+                sx={{ mb: 1 }}
+              >
+                <FormControlLabel
+                  value="tax"
+                  control={<Radio size="small" />}
+                  label={t('expenseApproval.voucher.invoiceTypeTax')}
+                />
+                <FormControlLabel
+                  value="proforma"
+                  control={<Radio size="small" />}
+                  label={t('expenseApproval.voucher.invoiceTypeProforma')}
+                />
+              </RadioGroup>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
                 <Button variant="outlined" startIcon={<QrCodeIcon />} onClick={handleOpenQr} disabled={qrLoading} sx={{ textTransform: 'none', borderRadius: '8px' }}>
                   {qrLoading ? t('expenseApproval.voucher.receiptQrLoading') : t('expenseApproval.voucher.receiptQr')}
@@ -3366,7 +4475,10 @@ const ExpenseApproval: React.FC = () => {
                     multiple
                     type="file"
                     accept="image/*,application/pdf"
-                    onChange={(e) => handleUploadReceipts(e.target.files)}
+                    onChange={(e) => {
+                      void handleUploadReceipts(e.target.files);
+                      e.target.value = '';
+                    }}
                   />
                 </Button>
                 <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadExpenseData} sx={{ textTransform: 'none', borderRadius: '8px' }}>
@@ -3374,7 +4486,10 @@ const ExpenseApproval: React.FC = () => {
                 </Button>
               </Box>
               {currentAttachments.length ? (
-                renderAttachmentList(currentAttachments)
+                renderAttachmentList(currentAttachments, {
+                  deletable: true,
+                  onDelete: handleDeleteReceipt,
+                })
               ) : (
                 <Typography variant="body2" color="text.secondary">
                   {t('expenseApproval.voucher.receiptNone')}
@@ -3386,8 +4501,16 @@ const ExpenseApproval: React.FC = () => {
               <Button variant="outlined" onClick={() => setViewMode('list')} sx={hvoBodyOutlinedBtnSx}>
                 {t('common.cancel')}
               </Button>
-              <Button variant="contained" disableElevation onClick={handleSaveExpense} disabled={saving || isInitializingDraft} sx={hvoBodyPrimaryBtnSx}>
-                {saving ? t('expenseApproval.voucher.submitSaving') : (isEdit ? t('expenseApproval.voucher.submit') : t('expenseApproval.voucher.create'))}
+              <Button variant="contained" disableElevation onClick={() => void handleSaveExpense()} disabled={saving || isInitializingDraft} sx={hvoBodyPrimaryBtnSx}>
+                {saving
+                  ? isRevisionResubmitEdit
+                    ? t('expenseApproval.voucher.resubmitAfterRevisionSaving')
+                    : t('expenseApproval.voucher.submitSaving')
+                  : isRevisionResubmitEdit
+                    ? t('expenseApproval.voucher.resubmitAfterRevision')
+                    : isEdit
+                      ? t('expenseApproval.voucher.submit')
+                      : t('expenseApproval.voucher.create')}
               </Button>
             </Box>
             </Box>
@@ -3428,7 +4551,10 @@ const ExpenseApproval: React.FC = () => {
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
                   {t('expenseApproval.detail.attachments')} ({currentAttachments.length})
                 </Typography>
-                {renderAttachmentList(currentAttachments)}
+                {renderAttachmentList(currentAttachments, {
+                  deletable: true,
+                  onDelete: handleDeleteReceipt,
+                })}
               </Box>
             )}
           </DialogContent>
@@ -3436,6 +4562,66 @@ const ExpenseApproval: React.FC = () => {
             <Button onClick={() => setQrOpen(false)} sx={hvoBodyOutlinedBtnSx}>{t('common.close')}</Button>
           </DialogActions>
         </Dialog>
+
+        <Dialog open={reasonDialogOpen} onClose={closeReasonDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            {reasonDialogType === 'payment-approve'
+              ? t('expenseApproval.dialog.finalApproveReasonTitle')
+              : reasonDialogType === 'expense-edit'
+                ? t('expenseApproval.dialog.editReasonTitle')
+                : reasonDialogType === 'expense-revision-reject'
+                  ? t('expenseApproval.dialog.revisionRejectReasonTitle')
+                  : t('expenseApproval.dialog.rejectReasonTitle')}
+          </DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              multiline
+              minRows={3}
+              placeholder={
+                reasonDialogType === 'payment-approve'
+                  ? t('expenseApproval.dialog.finalApproveReasonPlaceholder')
+                  : reasonDialogType === 'expense-edit'
+                    ? t('expenseApproval.dialog.editReasonPlaceholder')
+                    : reasonDialogType === 'expense-revision-reject'
+                      ? t('expenseApproval.dialog.revisionRejectReasonPlaceholder')
+                      : t('expenseApproval.dialog.rejectReasonPlaceholder')
+              }
+              value={reasonText}
+              onChange={(e) => setReasonText(e.target.value)}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button variant="outlined" onClick={closeReasonDialog} sx={hvoBodyOutlinedBtnSx}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="contained"
+              disableElevation
+              color={
+                reasonDialogType === 'payment-approve'
+                  ? 'success'
+                  : reasonDialogType === 'expense-edit'
+                    ? 'primary'
+                    : reasonDialogType === 'expense-revision-reject'
+                      ? 'warning'
+                      : 'error'
+              }
+              onClick={() => void handleReasonSubmit()}
+              sx={hvoBodyPrimaryBtnSx}
+            >
+              {reasonDialogType === 'payment-approve'
+                ? t('expenseApproval.actions.approve')
+                : reasonDialogType === 'expense-edit'
+                  ? t('expenseApproval.voucher.resubmitAfterRevision')
+                  : reasonDialogType === 'expense-revision-reject'
+                    ? t('expenseApproval.actions.revisionReject')
+                    : t('expenseApproval.actions.reject')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {attachmentPreviewDialog}
         {statusSnackbars}
       </Box>
@@ -3475,6 +4661,7 @@ const ExpenseApproval: React.FC = () => {
     const isPaymentApproved = selectedExpense.paymentRequestStatus === 'approved';
     const isPaymentPaid = selectedExpense.paymentRequestStatus === 'paid';
     const canApproveThis = listTab !== 'transfer' && canUserApproveExpense(selectedExpense);
+    const canRevisionRejectThis = listTab !== 'transfer' && canUserRevisionRejectExpense(selectedExpense);
     const canEditThis = canEditExpense(selectedExpense);
     const canResubmitThis = canResubmitExpense(selectedExpense);
     const canChangeApproverThis = listTab !== 'transfer' && canChangeExpenseApprover(selectedExpense);
@@ -3490,7 +4677,15 @@ const ExpenseApproval: React.FC = () => {
       const steps = [...(selectedExpense.approvalFlow || [])].sort(
         (a, b) => (a.stepOrder || 0) - (b.stepOrder || 0)
       );
-      const nodes: Array<{ key: string; label: string; name: string; muted?: boolean; editable?: boolean }> = [
+      const nodes: Array<{
+        key: string;
+        label: string;
+        name: string;
+        muted?: boolean;
+        editable?: boolean;
+        pdfHide?: boolean;
+        relaxedLabel?: boolean;
+      }> = [
         {
           key: 'prepared',
           label: t('expenseApproval.voucher.prepared'),
@@ -3512,6 +4707,8 @@ const ExpenseApproval: React.FC = () => {
             label: getExpenseFlowStampLabel(step, (key) => t(key)),
             name: step.approverName || getUserNameById(step.approverId),
             muted: step.status === 'skipped',
+            pdfHide: step.status === 'skipped',
+            relaxedLabel: step.action === 'revision_rejected',
             editable:
               isSameUserId(step.approverId, approvedById) ||
               (approvedById == null && index === lastIndex),
@@ -3549,6 +4746,15 @@ const ExpenseApproval: React.FC = () => {
                 </Button>
                 <Button
                   variant="contained"
+                  color="warning"
+                  disableElevation
+                  startIcon={<EditIcon fontSize="small" />}
+                  onClick={() => openReasonDialog('expense-revision-reject', selectedExpense.id)}
+                >
+                  {t('expenseApproval.actions.revisionReject')}
+                </Button>
+                <Button
+                  variant="contained"
                   color="error"
                   disableElevation
                   startIcon={<CancelIcon fontSize="small" />}
@@ -3557,6 +4763,17 @@ const ExpenseApproval: React.FC = () => {
                   {t('expenseApproval.actions.reject')}
                 </Button>
               </>
+            )}
+            {!canApproveThis && canRevisionRejectThis && (
+              <Button
+                variant="contained"
+                color="warning"
+                disableElevation
+                startIcon={<EditIcon fontSize="small" />}
+                onClick={() => openReasonDialog('expense-revision-reject', selectedExpense.id)}
+              >
+                {t('expenseApproval.actions.revisionReject')}
+              </Button>
             )}
             {canEditThis && (
             <Button
@@ -3583,7 +4800,7 @@ const ExpenseApproval: React.FC = () => {
             </>
           }
         />
-        </Box>
+          </Box>
 
         <Card
           elevation={0}
@@ -3593,17 +4810,26 @@ const ExpenseApproval: React.FC = () => {
         >
           <Box sx={{ borderBottom: `1px solid ${EXPENSE_LINE}`, bgcolor: '#FFFFFF' }}>
             <Box
+              className="expense-pdf-header"
               sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                justifyContent: { md: 'space-between' },
+                alignItems: { xs: 'stretch', md: 'flex-start' },
                 gap: { xs: 1, md: 1.5 },
-                alignItems: 'stretch',
+                width: '100%',
                 px: { xs: 1.5, sm: 2 },
                 pt: 2,
                 pb: 1.25,
+                overflowX: { md: 'auto' },
+                overflowY: 'visible',
+                boxSizing: 'border-box',
               }}
             >
-              <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box
+                className="expense-pdf-header-left"
+                sx={{ minWidth: 0, flex: { md: '1 1 auto' }, display: 'flex', flexDirection: 'column', gap: 1.5 }}
+              >
                 <ExpenseCompanyBlock
                   logo={companyLogo}
                   logoAlt={t('expenseApproval.voucher.companyLogoAlt')}
@@ -3611,144 +4837,141 @@ const ExpenseApproval: React.FC = () => {
                   address={companyAddress}
                   gstNumber={companyGstNumber}
                 />
-                <ExpenseVoucherMetaTable
-                  voucherLabel={t('expenseApproval.voucher.labelVoucherNumber')}
-                  dateLabel={t('expenseApproval.voucher.labelDateCreated')}
-                  voucherNo={voucherNo}
-                  dateText={
-                    voucherDate
-                      ? new Date(String(voucherDate).slice(0, 10) + 'T00:00:00').toLocaleDateString(dateLocale)
-                      : '-'
-                  }
-                />
+                <Box className="expense-pdf-voucher-row">
+                  <ExpenseVoucherMetaTable
+                    voucherLabel={t('expenseApproval.voucher.labelVoucherNumber')}
+                    dateLabel={t('expenseApproval.voucher.labelDateCreated')}
+                    voucherNo={voucherNo}
+                    dateText={
+                      voucherDate
+                        ? new Date(String(voucherDate).slice(0, 10) + 'T00:00:00').toLocaleDateString(dateLocale)
+                        : '-'
+                    }
+                  />
+                </Box>
               </Box>
 
               <Box
+                className="expense-pdf-header-right"
                 sx={{
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'flex-end',
                   gap: 1,
+                  flexShrink: 0,
+                  ml: { md: 'auto' },
                   width: { xs: '100%', md: 'auto' },
+                  maxWidth: '100%',
                 }}
               >
                 <Typography
+                  className="expense-pdf-amount expense-pdf-doc-title"
                   sx={{
                     fontWeight: 700,
                     fontSize: '1.125rem',
-                    color: 'primary.main',
-                    fontVariantNumeric: 'tabular-nums',
+                    color: '#0F172A',
                     textAlign: 'right',
                   }}
                 >
-                  {displayExpenseCurrency(selectedExpense.currency)} {formatAmount(taxSummary.grandTotal)}
+                  {t('expenseApproval.voucher.subtitle')}
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', mt: -0.5, textAlign: 'right' }}>
-                  {t('expenseApproval.detail.amountInclTax')}
-                </Typography>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, approvalFlowNodes.length))}, 168px)`,
-                    columnGap: 1,
-                    rowGap: 1,
-                    width: 'max-content',
-                    maxWidth: '100%',
-                    ml: 'auto',
-                  }}
-                >
-                  {approvalFlowNodes.map((node, index) => {
-                    const isLast = index === approvalFlowNodes.length - 1;
-                    const isRowEnd = (index + 1) % 4 === 0;
-                    const showArrow = !isLast && !isRowEnd;
-                    return (
-                      <Box
-                        key={node.key}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          width: 168,
-                          height: 72,
-                        }}
-                      >
-                        <ExpenseFlowStamp
-                          label={node.label}
-                          name={node.name}
-                          muted={node.muted}
-                          wide={false}
-                        >
-                          {canChangeApproverThis && node.editable ? (
-                            <Autocomplete
-                              fullWidth
-                              size="small"
-                              disabled={approverSaving}
-                              options={selectableApprovers}
-                              getOptionLabel={(option) => option.name}
-                              isOptionEqualToValue={(a, b) => Number(a.id) === Number(b.id)}
-                              value={
-                                selectableApprovers.find((item) => isSameUserId(item.id, approvedById))
-                                || approvers.find((item) => isSameUserId(item.id, approvedById))
-                                || null
-                              }
-                              onChange={(_, value) => {
-                                handleChangeApprover(value);
-                              }}
-                              sx={{
-                                width: '100%',
-                                '& .MuiAutocomplete-endAdornment': {
-                                  top: '50%',
-                                  transform: 'translateY(-50%)',
-                                  right: 0,
-                                },
-                              }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  placeholder={t('expenseApproval.placeholders.searchSimple')}
-                                  variant="standard"
+                <Box className="expense-pdf-stamps" sx={expenseApprovalStampsGridSx}>
+                  {chunkApprovalFlowNodes(approvalFlowNodes, EXPENSE_APPROVAL_STAMPS_PER_ROW).map((rowNodes, rowIndex) => (
+                    <Box
+                      key={`expense-approval-stamp-row-${rowIndex}`}
+                      className="expense-pdf-stamps-row"
+                      sx={expenseApprovalStampsRowSx}
+                    >
+                      {rowNodes.map((node, colIndex) => {
+                        const isLastInRow = colIndex === rowNodes.length - 1;
+                        const showArrow = !isLastInRow;
+                        return (
+                          <Box
+                            key={node.key}
+                            className={`expense-flow-stamp-wrap${node.pdfHide ? ' expense-pdf-hide' : ''}`}
+                            sx={expenseApprovalStampWrapSx}
+                          >
+                            <ExpenseFlowStamp
+                              label={node.label}
+                              name={node.name}
+                              muted={node.muted}
+                              wide={false}
+                              fluidWidth
+                              relaxedLabel={node.relaxedLabel}
+                            >
+                              {canChangeApproverThis && node.editable ? (
+                                <Autocomplete
+                                  fullWidth
                                   size="small"
-                                  InputProps={{
-                                    ...params.InputProps,
-                                    disableUnderline: true,
+                                  disabled={approverSaving}
+                                  options={selectableApprovers}
+                                  getOptionLabel={(option) => option.name}
+                                  isOptionEqualToValue={(a, b) => Number(a.id) === Number(b.id)}
+                                  value={
+                                    selectableApprovers.find((item) => isSameUserId(item.id, approvedById))
+                                    || approvers.find((item) => isSameUserId(item.id, approvedById))
+                                    || null
+                                  }
+                                  onChange={(_, value) => {
+                                    handleChangeApprover(value);
                                   }}
                                   sx={{
-                                    '& .MuiInputBase-root': {
-                                      fontSize: '0.8125rem',
-                                      fontWeight: 600,
-                                      justifyContent: 'center',
-                                      minHeight: 32,
-                                      height: 32,
-                                      alignItems: 'center',
-                                    },
-                                    '& .MuiInputBase-input': {
-                                      textAlign: 'center',
-                                      py: 0,
-                                      height: 32,
-                                      boxSizing: 'border-box',
+                                    width: '100%',
+                                    '& .MuiAutocomplete-endAdornment': {
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      right: 0,
                                     },
                                   }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      placeholder={t('expenseApproval.placeholders.searchSimple')}
+                                      variant="standard"
+                                      size="small"
+                                      InputProps={{
+                                        ...params.InputProps,
+                                        disableUnderline: true,
+                                      }}
+                                      sx={{
+                                        '& .MuiInputBase-root': {
+                                          fontSize: '0.8125rem',
+                                          fontWeight: 600,
+                                          justifyContent: 'center',
+                                          minHeight: 32,
+                                          height: 32,
+                                          alignItems: 'center',
+                                        },
+                                        '& .MuiInputBase-input': {
+                                          textAlign: 'center',
+                                          py: 0,
+                                          height: 32,
+                                          boxSizing: 'border-box',
+                                        },
+                                      }}
+                                    />
+                                  )}
                                 />
-                              )}
-                            />
-                          ) : undefined}
-                        </ExpenseFlowStamp>
-                        <Box
-                          sx={{
-                            width: 20,
-                            flexShrink: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {showArrow ? (
-                            <ArrowForwardIcon sx={{ color: '#94A3B8', fontSize: 20 }} />
-                          ) : null}
-                        </Box>
-                      </Box>
-                    );
-                  })}
+                              ) : undefined}
+                            </ExpenseFlowStamp>
+                            {showArrow ? (
+                              <Box
+                                sx={{
+                                  width: 20,
+                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <ArrowForwardIcon sx={{ color: '#94A3B8', fontSize: 20 }} />
+                              </Box>
+                            ) : null}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  ))}
                 </Box>
               </Box>
             </Box>
@@ -3756,20 +4979,27 @@ const ExpenseApproval: React.FC = () => {
 
           <CardContent sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
             <Box
+              className="expense-pdf-title-row"
               sx={{
                 border: `1px solid ${EXPENSE_LINE}`,
                 display: 'grid',
-                gridTemplateColumns: '88px 1fr',
-                minHeight: 52,
+                gridTemplateColumns: `${EXPENSE_KV_LABEL_WIDTH_PX}px minmax(0, 1fr)`,
+                minHeight: COMPACT_ROW_HEIGHT,
+                height: COMPACT_ROW_HEIGHT,
                 bgcolor: '#FFFFFF',
+                boxSizing: 'border-box',
               }}
             >
               <Box
+                className="expense-pdf-kv-label"
                 sx={{
-                  ...voucherMetaLabelSx,
+                  ...kvLabelCellSx,
                   display: 'flex',
                   alignItems: 'center',
-                  py: 1.25,
+                  py: '0 !important',
+                  lineHeight: 1,
+                  height: '100%',
+                  borderRight: `1px solid ${EXPENSE_LINE}`,
                 }}
               >
                 {t('expenseApproval.voucher.labelTitle')}
@@ -3777,44 +5007,43 @@ const ExpenseApproval: React.FC = () => {
               <Box
                 sx={{
                   px: 1.25,
-                  py: 1.25,
+                  py: 0,
                   display: 'flex',
-                  flexWrap: 'wrap',
+                  flexWrap: 'nowrap',
                   alignItems: 'center',
                   gap: 1,
                   minWidth: 0,
+                  height: '100%',
+                  lineHeight: 1,
                 }}
               >
-                <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: '#0F172A', lineHeight: 1.4 }}>
+                <Typography
+                  className="expense-pdf-title"
+                  sx={{ fontWeight: 700, fontSize: '1rem', color: '#0F172A', lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                >
                   {selectedExpense.title || t('expenseApproval.detail.title')}
-                </Typography>
-                {getStatusChip(resolveDisplayStatus(selectedExpense))}
-                {getPriorityChip(selectedExpense.priority)}
+                  </Typography>
+                <Box className="expense-pdf-hide" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  {getStatusChip(resolveDisplayStatus(selectedExpense))}
+                  {getPriorityChip(selectedExpense.priority)}
+                </Box>
+                </Box>
               </Box>
-            </Box>
 
             {/* 지출 신청 */}
-            <Box
-              sx={{
-                ...sectionBlockSx,
-                borderLeft: `3px solid ${EXPENSE_REQUEST_ACCENT}`,
-                bgcolor: EXPENSE_REQUEST_BG,
-              }}
-            >
-              <Box sx={{ ...sectionHeaderBarSx, bgcolor: EXPENSE_MUTED_BG }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.8125rem', color: EXPENSE_REQUEST_ACCENT }}>
+            <Box className="expense-pdf-section">
+              <Typography className="expense-pdf-section-title" variant="subtitle2" sx={sectionTitleSx}>
                   {t('expenseApproval.voucher.sectionRequest')}
-                </Typography>
-              </Box>
-              <TableContainer sx={{ bgcolor: '#FFFFFF', overflowX: 'hidden' }}>
+              </Typography>
+              <TableContainer sx={{ border: `1px solid ${EXPENSE_LINE}`, bgcolor: '#FFFFFF', overflowX: 'hidden' }}>
                 <Table size="small" sx={compactTableSx}>
                   <TableBody>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.columns.requester')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.columns.requester')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{selectedExpense.requesterName || '-'}</ClampText>
                       </TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.departmentRole')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.departmentRole')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>
                           {[selectedExpense.requesterDepartment, selectedExpense.requesterPosition]
@@ -3824,7 +5053,7 @@ const ExpenseApproval: React.FC = () => {
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell sx={{ ...kvLabelCellSx, borderBottom: 'none' }}>
+                      <TableCell className="expense-pdf-kv-label" sx={{ ...kvLabelCellSx, borderBottom: 'none' }}>
                         {t('expenseApproval.detail.purpose')}
                       </TableCell>
                       <TableCell colSpan={3} sx={{ borderBottom: 'none', fontWeight: 600, ...wrapCellSx }}>
@@ -3839,48 +5068,39 @@ const ExpenseApproval: React.FC = () => {
             </Box>
 
             {/* 대금을 받는 협력업체 */}
-            <Box
-              sx={{
-                ...sectionBlockSx,
-                border: `1px solid ${EXPENSE_VENDOR_LINE}`,
-                borderLeft: `3px solid ${EXPENSE_VENDOR_ACCENT}`,
-                bgcolor: EXPENSE_VENDOR_BG,
-              }}
-            >
-              <Box sx={{ ...sectionHeaderBarSx, bgcolor: EXPENSE_VENDOR_HEADER, borderBottomColor: EXPENSE_VENDOR_LINE }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.8125rem', color: EXPENSE_VENDOR_ACCENT }}>
+            <Box className="expense-pdf-section">
+              <Typography className="expense-pdf-section-title" variant="subtitle2" sx={sectionTitleSx}>
                   {t('expenseApproval.voucher.sectionVendor')}
-                </Typography>
-              </Box>
-              <TableContainer sx={{ bgcolor: '#FFFFFF', overflowX: 'hidden' }}>
+              </Typography>
+              <TableContainer sx={{ border: `1px solid ${EXPENSE_VENDOR_LINE}`, bgcolor: '#FFFFFF', overflowX: 'hidden' }}>
                 <Table size="small" sx={compactTableSx}>
                   <TableBody>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPartner')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPartner')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText title={partnerName}>{partnerName}</ClampText>
                       </TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelGstNumber')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelGstNumber')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText title={String(partnerDetail.gstNumber || '')}>{partnerDetail.gstNumber}</ClampText>
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelRepresentative')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelRepresentative')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{partnerDetail.partnerRepresentative}</ClampText>
                       </TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPanNumber')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPanNumber')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{partnerDetail.partnerPan}</ClampText>
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPartnerPhone')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPartnerPhone')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{partnerDetail.partnerPhone}</ClampText>
                       </TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPartnerEmail')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelPartnerEmail')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText title={String(partnerDetail.partnerEmail || '')}>
                           {partnerDetail.partnerEmail}
@@ -3888,33 +5108,33 @@ const ExpenseApproval: React.FC = () => {
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelAccountHolder')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>
+                        {t('expenseApproval.voucher.labelPartnerAddress')}
+                      </TableCell>
+                      <TableCell colSpan={3} sx={{ fontWeight: 600, ...wrapCellSx }}>
+                        <ClampText title={formatEnglishSentenceLabel(partnerDetail.partnerAddress)}>
+                          {formatEnglishSentenceLabel(partnerDetail.partnerAddress) || '-'}
+                        </ClampText>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelAccountHolder')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText title={String(partnerDetail.acHolder || '')}>{partnerDetail.acHolder}</ClampText>
                       </TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelBankName')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelBankName')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{partnerDetail.bank}</ClampText>
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelAccountNumber')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelAccountNumber')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{partnerDetail.accountNumber}</ClampText>
                       </TableCell>
-                      <TableCell sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelIfsc')}</TableCell>
+                      <TableCell className="expense-pdf-kv-label" sx={kvLabelCellSx}>{t('expenseApproval.voucher.labelIfsc')}</TableCell>
                       <TableCell sx={{ fontWeight: 600, ...wrapCellSx }}>
                         <ClampText>{partnerDetail.ifsc}</ClampText>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell sx={{ ...kvLabelCellSx, borderBottom: 'none' }}>
-                        {t('expenseApproval.voucher.labelPartnerAddress')}
-                      </TableCell>
-                      <TableCell colSpan={3} sx={{ fontWeight: 600, borderBottom: 'none', ...wrapCellSx }}>
-                        <ClampText title={String(partnerDetail.partnerAddress || '')}>
-                          {partnerDetail.partnerAddress}
-                        </ClampText>
                       </TableCell>
                     </TableRow>
                   </TableBody>
@@ -3923,10 +5143,17 @@ const ExpenseApproval: React.FC = () => {
             </Box>
 
             {/* 지출 항목 */}
-            <Box>
-              <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.detail.items')}</Typography>
-              <TableContainer sx={{ border: `1px solid ${EXPENSE_LINE}`, overflowX: 'hidden' }}>
-                <Table size="small" sx={compactTableSx}>
+            <Box className="expense-pdf-section">
+              <Typography className="expense-pdf-section-title" variant="subtitle2" sx={sectionTitleSx}>
+                  {t('expenseApproval.detail.items')}
+              </Typography>
+              <TableContainer sx={{ border: `1px solid ${EXPENSE_LINE}`, overflowX: 'hidden', overflowY: 'visible' }}>
+                <Table size="small" className="expense-pdf-items" sx={expenseItemsTableSx}>
+                  <colgroup>
+                    <col style={{ width: 128 }} />
+                    <col />
+                    <col style={{ width: EXPENSE_TAX_BOX_WIDTH_PX }} />
+                  </colgroup>
                   <TableHead
                     sx={{
                       bgcolor: EXPENSE_HEADER_BG,
@@ -3943,30 +5170,46 @@ const ExpenseApproval: React.FC = () => {
                     }}
                   >
                     <TableRow>
-                      <TableCell sx={{ width: '18%' }}>{t('expenseApproval.detail.columns.invoiceDate')}</TableCell>
-                      <TableCell sx={{ width: '42%' }}>{t('expenseApproval.detail.columns.description')}</TableCell>
-                      <TableCell align="right" sx={{ width: '10%' }}>{t('expenseApproval.detail.columns.qty')}</TableCell>
-                      <TableCell align="right" sx={{ width: '15%' }}>{t('expenseApproval.detail.columns.unitPrice')}</TableCell>
-                      <TableCell align="right" sx={{ width: '15%' }}>{t('expenseApproval.detail.columns.amount')}</TableCell>
+                      <TableCell sx={{ width: 128, minWidth: 128, maxWidth: 128 }}>{t('expenseApproval.detail.columns.invoiceDate')}</TableCell>
+                      <TableCell>{t('expenseApproval.detail.columns.description')}</TableCell>
+                      <TableCell align="right" className="expense-pdf-items-numeric-block" sx={expenseItemsNumericBlockCellSx}>
+                        <Box className="expense-pdf-items-numeric-grid" sx={expenseItemsNumericGridSx}>
+                          <Box />
+                          <Box sx={expenseItemsNumericHeaderCellSx}>{t('expenseApproval.detail.columns.qty')}</Box>
+                          <Box sx={expenseItemsNumericHeaderCellSx}>{t('expenseApproval.detail.columns.unitPrice')}</Box>
+                          <Box sx={{ ...expenseItemsNumericHeaderCellSx, ...expenseAmountCellSx }}>
+                            {t('expenseApproval.detail.columns.amount')}
+                          </Box>
+                        </Box>
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(selectedExpense.items || []).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>
+                        <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary' }}>
                           {t('expenseApproval.voucher.lineItemsEmpty')}
                         </TableCell>
                       </TableRow>
                     ) : (
                       selectedExpense.items.map((item) => (
-                        <TableRow key={item.id || item.description}>
-                          <TableCell>{item.invoiceDate || '-'}</TableCell>
+                      <TableRow key={item.id || item.description}>
+                        <TableCell>{item.invoiceDate || '-'}</TableCell>
                           <TableCell sx={wrapCellSx}>
                             <ClampText title={String(item.description || '')}>{item.description || '-'}</ClampText>
                           </TableCell>
-                          <TableCell align="right">{item.qty ?? '-'}</TableCell>
-                          <TableCell align="right">{formatAmount(item.unitPrice ?? item.amount ?? 0)}</TableCell>
-                          <TableCell align="right">{formatAmount(item.total ?? item.amount ?? 0)}</TableCell>
+                          <TableCell className="expense-pdf-items-numeric-block" sx={expenseItemsNumericBlockCellSx}>
+                            <Box className="expense-pdf-items-numeric-grid" sx={expenseItemsNumericGridSx}>
+                              <Box />
+                              <Box sx={expenseItemsNumericValueCellSx}>{item.qty ?? '-'}</Box>
+                              <Box sx={expenseItemsNumericValueCellSx}>
+                                {formatAmount(item.unitPrice ?? item.amount ?? 0)}
+                              </Box>
+                              <Box sx={{ ...expenseItemsNumericValueCellSx, ...expenseAmountCellSx }}>
+                                {formatAmount(item.total ?? item.amount ?? 0)}
+                              </Box>
+                            </Box>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -3975,31 +5218,30 @@ const ExpenseApproval: React.FC = () => {
               </TableContainer>
             </Box>
 
-            <Box sx={{ width: 'fit-content', maxWidth: '100%', ml: { xs: 0, sm: 'auto' } }}>
+            <Box
+              className="expense-pdf-tax"
+              sx={{
+                width: { xs: '100%', sm: EXPENSE_TAX_BOX_WIDTH_PX },
+                minWidth: { xs: '100%', sm: EXPENSE_TAX_BOX_WIDTH_PX },
+                maxWidth: '100%',
+                ml: { xs: 0, sm: 'auto' },
+                overflow: 'visible',
+              }}
+            >
               <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.voucher.sectionTax')}</Typography>
-              <TableContainer sx={{ border: `1px solid ${EXPENSE_LINE}` }}>
-                <Table
-                  size="small"
-                  sx={{
-                    ...compactTableSx,
-                    tableLayout: 'auto',
-                    width: 'max-content',
-                    minWidth: '100%',
-                    '& .MuiTableCell-root': {
-                      ...compactTableSx['& .MuiTableCell-root'],
-                      whiteSpace: 'nowrap',
-                      overflow: 'visible',
-                      textOverflow: 'clip',
-                    },
-                  }}
-                >
+              <TableContainer sx={expenseTaxTableContainerSx}>
+                <Table size="small" sx={expenseTaxTableSx}>
+                  <colgroup>
+                    <col />
+                    <col style={{ width: EXPENSE_TAX_RATE_COL_WIDTH_PX }} />
+                    <col style={{ width: EXPENSE_TAX_AMOUNT_COL_WIDTH_PX }} />
+                  </colgroup>
                   <TableBody>
                     <TableRow sx={{ bgcolor: EXPENSE_HEADER_BG }}>
-                      <TableCell sx={{ color: EXPENSE_HEADER_FG, fontWeight: 600 }}>
+                      <TableCell colSpan={2} sx={{ color: EXPENSE_HEADER_FG, fontWeight: 600 }}>
                         {t('expenseApproval.voucher.taxSubtotal')}
                       </TableCell>
-                      <TableCell sx={{ width: 48 }} />
-                      <TableCell align="right" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: EXPENSE_HEADER_FG }}>
+                      <TableCell align="right" sx={{ ...expenseAmountCellSx, fontWeight: 600, color: EXPENSE_HEADER_FG }}>
                         {formatAmount(taxSummary.subtotal)}
                       </TableCell>
                     </TableRow>
@@ -4011,7 +5253,7 @@ const ExpenseApproval: React.FC = () => {
                       <TableRow key={row.label}>
                         <TableCell>{row.label}</TableCell>
                         <TableCell align="center" sx={{ color: 'text.secondary' }}>{row.rate}%</TableCell>
-                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <TableCell align="right" sx={expenseAmountCellSx}>
                           {formatAmount(row.amount)}
                         </TableCell>
                       </TableRow>
@@ -4020,17 +5262,20 @@ const ExpenseApproval: React.FC = () => {
                       <TableRow>
                         <TableCell>TDS (E)</TableCell>
                         <TableCell align="center" sx={{ color: 'text.secondary' }}>{taxSummary.tdsRate}%</TableCell>
-                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <TableCell align="right" sx={expenseAmountCellSx}>
                           −{formatAmount(taxSummary.tdsAmount)}
                         </TableCell>
                       </TableRow>
                     ) : null}
-                    <TableRow sx={{ bgcolor: EXPENSE_TOTAL_BG }}>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: 'none', color: EXPENSE_TOTAL_FG }}>
+                    <TableRow className="expense-pdf-grand-row" sx={{ bgcolor: EXPENSE_TOTAL_BG }}>
+                      <TableCell className="expense-pdf-grand" colSpan={2} sx={{ fontWeight: 700, borderBottom: 'none', color: EXPENSE_TOTAL_FG }}>
                         {t('expenseApproval.voucher.grandTotal')}
                       </TableCell>
-                      <TableCell sx={{ borderBottom: 'none' }} />
-                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', borderBottom: 'none', color: EXPENSE_TOTAL_FG }}>
+                      <TableCell
+                        className="expense-pdf-grand"
+                        align="right"
+                        sx={{ ...expenseAmountCellSx, fontWeight: 700, borderBottom: 'none', color: EXPENSE_TOTAL_FG }}
+                      >
                         {displayExpenseCurrency(selectedExpense.currency)} {formatAmount(taxSummary.grandTotal)}
                       </TableCell>
                     </TableRow>
@@ -4045,7 +5290,7 @@ const ExpenseApproval: React.FC = () => {
                                   {t('expenseApproval.detail.paidAmount')} {formatRemittanceDateTime(row.timestamp)}
                                 </TableCell>
                                 <TableCell />
-                                <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                                <TableCell align="right" sx={expenseAmountCellSx}>
                                   {displayExpenseCurrency(selectedExpense.currency)} {formatAmount(row.amount)}
                                 </TableCell>
                               </TableRow>
@@ -4054,7 +5299,7 @@ const ExpenseApproval: React.FC = () => {
                             <TableRow>
                               <TableCell>{t('expenseApproval.detail.paidAmount')}</TableCell>
                               <TableCell />
-                              <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                              <TableCell align="right" sx={expenseAmountCellSx}>
                                 {displayExpenseCurrency(selectedExpense.currency)}{' '}
                                 {formatAmount(Number(selectedExpense.paidAmount || 0))}
                               </TableCell>
@@ -4065,7 +5310,7 @@ const ExpenseApproval: React.FC = () => {
                             {t('expenseApproval.detail.remainingAmount')}
                           </TableCell>
                           <TableCell />
-                          <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'warning.main' }}>
+                          <TableCell align="right" sx={{ ...expenseAmountCellSx, fontWeight: 700, color: 'warning.main' }}>
                             {displayExpenseCurrency(selectedExpense.currency)}{' '}
                             {formatAmount(getExpenseRemainingAmount(selectedExpense))}
                           </TableCell>
@@ -4078,12 +5323,106 @@ const ExpenseApproval: React.FC = () => {
             </Box>
 
             {/* 첨부파일 */}
-            {selectedExpense.attachments.length > 0 && (
-              <Box>
-                <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.detail.attachments')}</Typography>
-                {renderAttachmentList(selectedExpense.attachments)}
-              </Box>
-            )}
+            <Box className="expense-pdf-plain expense-pdf-hide">
+              <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.detail.attachments')}</Typography>
+              {expenseIsAwaitingTaxInvoice(selectedExpense) && (
+                <Alert severity="warning" sx={{ mb: 1.5, py: 0.5 }}>
+                  {t('expenseApproval.detail.awaitingTaxInvoiceHint')}
+                </Alert>
+              )}
+              {(() => {
+                // 송금 탭/송금 담당 화면에서는 인보이스 유형 선택·파일 첨부 UI를 숨김
+                // (송금 확인증은 '송금하기' 다이얼로그에서만 첨부)
+                const isRemittanceView = listTab === 'transfer';
+                const awaitingTax = expenseIsAwaitingTaxInvoice(selectedExpense);
+                const hasProforma = normalizeExpenseAttachments(selectedExpense.attachments).some(
+                  (row) => row.invoiceType === 'proforma'
+                );
+                const approvedWithProforma =
+                  isExpenseApproved && hasProforma && !expenseHasTaxInvoice(selectedExpense.attachments);
+                // 작성자만, 수정 가능하거나(초안/반려) 택스 인보이스 대기일 때 첨부 가능
+                // 프로포마로 승인된 뒤 송금 단계에서는 첨부 비활성
+                const showInvoiceUpload =
+                  isRequester &&
+                  !isRemittanceView &&
+                  !approvedWithProforma &&
+                  (canEditThis || awaitingTax);
+                const taxOnlyUpload = awaitingTax;
+
+                if (!showInvoiceUpload) {
+                  if (isRemittanceView || approvedWithProforma) {
+                    return (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                        {t('expenseApproval.detail.attachmentLockedOnRemittance')}
+                        </Typography>
+                    );
+                  }
+                  return null;
+                }
+
+                return (
+                  <Box sx={{ mb: 1.5 }}>
+                    {taxOnlyUpload ? (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                        {t('expenseApproval.detail.uploadTaxInvoiceOnly')}
+                      </Typography>
+                    ) : (
+                      <RadioGroup
+                        row
+                        value={receiptInvoiceType}
+                        onChange={(e) => setReceiptInvoiceType(e.target.value as ExpenseInvoiceType)}
+                        sx={{ mb: 0.75 }}
+                      >
+                        <FormControlLabel
+                          value="tax"
+                          control={<Radio size="small" />}
+                          label={t('expenseApproval.voucher.invoiceTypeTax')}
+                        />
+                        <FormControlLabel
+                          value="proforma"
+                          control={<Radio size="small" />}
+                          label={t('expenseApproval.voucher.invoiceTypeProforma')}
+                        />
+                      </RadioGroup>
+                    )}
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      disabled={uploadingReceipts}
+                      size="small"
+                      sx={{ textTransform: 'none', borderRadius: '8px' }}
+                      onClick={() => {
+                        if (taxOnlyUpload) setReceiptInvoiceType('tax');
+                      }}
+                    >
+                      {uploadingReceipts
+                        ? t('expenseApproval.voucher.receiptUploading')
+                        : taxOnlyUpload
+                          ? t('expenseApproval.voucher.uploadTaxInvoice')
+                          : t('expenseApproval.voucher.receiptUpload')}
+                      <input
+                        hidden
+                        multiple
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => {
+                          if (taxOnlyUpload) setReceiptInvoiceType('tax');
+                          void handleUploadReceipts(e.target.files);
+                          e.target.value = '';
+                        }}
+                      />
+                    </Button>
+                      </Box>
+                );
+              })()}
+              {selectedExpense.attachments.length > 0 ? (
+                renderAttachmentList(selectedExpense.attachments)
+              ) : (
+                      <Typography variant="body2" color="text.secondary">
+                  {t('expenseApproval.voucher.receiptNone')}
+                        </Typography>
+                      )}
+            </Box>
 
             {/* 송금 확인증 */}
             {(() => {
@@ -4092,18 +5431,18 @@ const ExpenseApproval: React.FC = () => {
                 .filter((p): p is string => Boolean(p));
               if (proofPaths.length === 0) return null;
               return (
-                <Box>
+                <Box className="expense-pdf-plain">
                   <Typography variant="subtitle2" sx={sectionTitleSx}>
                     {t('expenseApproval.detail.remittanceProofs')}
-                  </Typography>
+                        </Typography>
                   {renderAttachmentList(proofPaths)}
-                </Box>
+            </Box>
               );
             })()}
 
             {/* 메모 */}
             {(selectedExpense.notes || meta.remarks) && (
-              <Box>
+              <Box className="expense-pdf-plain">
                 <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.detail.notes')}</Typography>
                 <Box sx={{ p: 1, border: `1px solid ${EXPENSE_LINE}`, bgcolor: EXPENSE_MUTED_BG }}>
                   <Typography variant="body2">
@@ -4113,12 +5452,16 @@ const ExpenseApproval: React.FC = () => {
               </Box>
             )}
 
-            {(meta.rejectedReason || meta.rejectedComment) && (
-              <Box>
-                <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.detail.rejectedComment')}</Typography>
+            {(meta.revisionRejectReason || meta.rejectedReason || meta.rejectedComment) && (
+              <Box className="expense-pdf-plain">
+                <Typography variant="subtitle2" sx={sectionTitleSx}>
+                  {meta.revisionRejected
+                    ? t('expenseApproval.detail.revisionRejectComment')
+                    : t('expenseApproval.detail.rejectedComment')}
+                </Typography>
                 <Box sx={{ p: 1, border: `1px solid ${EXPENSE_LINE}`, bgcolor: EXPENSE_MUTED_BG }}>
                   <Typography variant="body2">
-                    {meta.rejectedReason || meta.rejectedComment}
+                    {meta.revisionRejectReason || meta.rejectedReason || meta.rejectedComment}
                   </Typography>
                 </Box>
               </Box>
@@ -4128,7 +5471,7 @@ const ExpenseApproval: React.FC = () => {
               selectedExpense.paymentRejectedReason ||
               selectedExpense.paymentApprovedAt ||
               selectedExpense.paymentRejectedAt) && (
-              <Box>
+              <Box className="expense-pdf-plain">
                 <Typography variant="subtitle2" sx={sectionTitleSx}>{t('expenseApproval.detail.paymentProcessing')}</Typography>
                 <Box sx={{ p: 1, border: `1px solid ${EXPENSE_LINE}`, bgcolor: EXPENSE_MUTED_BG }}>
                   {selectedExpense.paymentApprovedAt && (
@@ -4243,6 +5586,14 @@ const ExpenseApproval: React.FC = () => {
                   </Button>
                   <Button
                     variant="contained"
+                    color="warning"
+                    startIcon={<EditIcon />}
+                    onClick={() => openReasonDialog('expense-revision-reject', selectedExpense.id)}
+                  >
+                    {t('expenseApproval.actions.revisionReject')}
+                  </Button>
+                  <Button
+                    variant="contained"
                     color="error"
                     startIcon={<CancelIcon />}
                     onClick={() => openReasonDialog('expense-reject', selectedExpense.id)}
@@ -4251,11 +5602,27 @@ const ExpenseApproval: React.FC = () => {
                   </Button>
                 </>
               )}
+              {!canApproveThis && canRevisionRejectThis && (
+                <Button
+                  variant="contained"
+                  color="warning"
+                  startIcon={<EditIcon />}
+                  onClick={() => openReasonDialog('expense-revision-reject', selectedExpense.id)}
+                >
+                  {t('expenseApproval.actions.revisionReject')}
+                </Button>
+              )}
             </Box>
 
             <Dialog open={reasonDialogOpen} onClose={closeReasonDialog} maxWidth="sm" fullWidth>
               <DialogTitle>
-                {reasonDialogType === 'payment-approve' ? t('expenseApproval.dialog.finalApproveReasonTitle') : t('expenseApproval.dialog.rejectReasonTitle')}
+                {reasonDialogType === 'payment-approve'
+                  ? t('expenseApproval.dialog.finalApproveReasonTitle')
+                  : reasonDialogType === 'expense-edit'
+                    ? t('expenseApproval.dialog.editReasonTitle')
+                    : reasonDialogType === 'expense-revision-reject'
+                      ? t('expenseApproval.dialog.revisionRejectReasonTitle')
+                      : t('expenseApproval.dialog.rejectReasonTitle')}
               </DialogTitle>
               <DialogContent>
                 <TextField
@@ -4263,7 +5630,15 @@ const ExpenseApproval: React.FC = () => {
                   fullWidth
                   multiline
                   minRows={3}
-                  placeholder={reasonDialogType === 'payment-approve' ? t('expenseApproval.dialog.finalApproveReasonPlaceholder') : t('expenseApproval.dialog.rejectReasonPlaceholder')}
+                  placeholder={
+                    reasonDialogType === 'payment-approve'
+                      ? t('expenseApproval.dialog.finalApproveReasonPlaceholder')
+                      : reasonDialogType === 'expense-edit'
+                        ? t('expenseApproval.dialog.editReasonPlaceholder')
+                        : reasonDialogType === 'expense-revision-reject'
+                          ? t('expenseApproval.dialog.revisionRejectReasonPlaceholder')
+                          : t('expenseApproval.dialog.rejectReasonPlaceholder')
+                  }
                   value={reasonText}
                   onChange={(e) => setReasonText(e.target.value)}
                 />
@@ -4275,11 +5650,25 @@ const ExpenseApproval: React.FC = () => {
                 <Button
                   variant="contained"
                   disableElevation
-                  color={reasonDialogType === 'payment-approve' ? 'success' : 'error'}
-                  onClick={handleReasonSubmit}
+                  color={
+                    reasonDialogType === 'payment-approve'
+                      ? 'success'
+                      : reasonDialogType === 'expense-edit'
+                        ? 'primary'
+                        : reasonDialogType === 'expense-revision-reject'
+                          ? 'warning'
+                          : 'error'
+                  }
+                  onClick={() => void handleReasonSubmit()}
                   sx={hvoBodyPrimaryBtnSx}
                 >
-                  {reasonDialogType === 'payment-approve' ? t('expenseApproval.actions.approve') : t('expenseApproval.actions.reject')}
+                  {reasonDialogType === 'payment-approve'
+                    ? t('expenseApproval.actions.approve')
+                    : reasonDialogType === 'expense-edit'
+                      ? t('expenseApproval.voucher.resubmitAfterRevision')
+                      : reasonDialogType === 'expense-revision-reject'
+                        ? t('expenseApproval.actions.revisionReject')
+                        : t('expenseApproval.actions.reject')}
                 </Button>
               </DialogActions>
             </Dialog>
@@ -4341,11 +5730,9 @@ const ExpenseApproval: React.FC = () => {
                   <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary' }}>
                     {t('expenseApproval.dialog.remittanceProof')} *
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', mb: 0.5 }}>
-                    <Button variant="outlined" component="label" disabled={paymentSubmitting}>
-                      {paymentProofFile
-                        ? paymentProofFile.name
-                        : t('expenseApproval.dialog.remittanceProofUpload')}
+                  {!paymentProofFile ? (
+                    <Button variant="outlined" component="label" disabled={paymentSubmitting} sx={{ mb: 0.5 }}>
+                      {t('expenseApproval.dialog.remittanceProofUpload')}
                       <input
                         hidden
                         type="file"
@@ -4353,16 +5740,78 @@ const ExpenseApproval: React.FC = () => {
                         onChange={(e) => setRemittanceProofFile(e.target.files?.[0] || null)}
                       />
                     </Button>
-                    {paymentProofFile && (
-                      <Button
+                  ) : (
+                    <Box sx={{ mb: 0.5 }}>
+                      <TextField
                         size="small"
+                        fullWidth
+                        value={proofNameDraft}
                         disabled={paymentSubmitting}
-                        onClick={() => setRemittanceProofFile(null)}
-                      >
-                        {t('common.delete')}
-                      </Button>
-                    )}
-                  </Box>
+                        onChange={(e) =>
+                          setProofNameDraft(stripCorporateSuffixFromFilename(e.target.value))
+                        }
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => applyProofFileName(proofNameDraft)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.target as HTMLInputElement).blur();
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setProofNameDraft(paymentProofFile.name);
+                            (e.target as HTMLInputElement).blur();
+                          }
+                        }}
+                        helperText={t('expenseApproval.dialog.remittanceProofRenameTitle', {
+                          defaultValue: '클릭하여 파일명 변경',
+                        })}
+                        FormHelperTextProps={{ sx: { mx: 0 } }}
+                        inputProps={{
+                          'aria-label': t('expenseApproval.dialog.remittanceProofRenameTitle', {
+                            defaultValue: '클릭하여 파일명 변경',
+                          }),
+                        }}
+                        sx={{
+                          mb: 0.5,
+                          '& .MuiOutlinedInput-root': {
+                            bgcolor: '#fff',
+                            '& fieldset': { borderColor: EXPENSE_LINE },
+                          },
+                          '& .MuiOutlinedInput-input': {
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            py: 1,
+                          },
+                        }}
+                      />
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Button
+                          size="small"
+                          disabled={paymentSubmitting}
+                          onClick={() => setRemittanceProofFile(null)}
+                        >
+                          {t('common.delete')}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          component="label"
+                          disabled={paymentSubmitting}
+                        >
+                          {t('expenseApproval.dialog.remittanceProofChange', {
+                            defaultValue: '파일 변경',
+                          })}
+                          <input
+                            hidden
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => setRemittanceProofFile(e.target.files?.[0] || null)}
+                          />
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
                   {paymentProofPreviewUrl && (
                     <Box
                       component="img"
@@ -4409,7 +5858,7 @@ const ExpenseApproval: React.FC = () => {
           {`
             @page {
               size: A4;
-              margin: 20mm 10mm 12mm 20mm;
+              margin: 10mm 10mm 10mm 20mm;
             }
             @media print {
               html, body, #root {
@@ -4464,21 +5913,21 @@ const ExpenseApproval: React.FC = () => {
         title={t('expenseApproval.title')}
         mb={2}
         actions={
-          <Button
-            variant="contained"
-            disableElevation
-            startIcon={<AddIcon fontSize="small" />}
-            onClick={handleCreateExpense}
+        <Button
+          variant="contained"
+          disableElevation
+          startIcon={<AddIcon fontSize="small" />}
+          onClick={handleCreateExpense}
             sx={hvoBodyPrimaryBtnSx}
-          >
-            {t('expenseApproval.actions.requestExpense')}
-          </Button>
+        >
+          {t('expenseApproval.actions.requestExpense')}
+        </Button>
         }
       />
 
       <Card elevation={0} sx={{ ...hvoBodyCardSx, mb: 3 }}>
-        <Tabs
-          value={listTab}
+      <Tabs
+        value={listTab}
           onChange={(_, value) => {
             setListTab(value);
             setStatusFilter('');
@@ -4505,19 +5954,19 @@ const ExpenseApproval: React.FC = () => {
               letterSpacing: '-0.01em',
               color: 'text.secondary' },
             '& .MuiTab-root.Mui-selected': { color: 'primary.main', fontWeight: 700 } }}
-        >
-          <Tab label={t('expenseApproval.tabs.written')} value="written" />
-          <Tab label={t('expenseApproval.tabs.received')} value="received" />
-          {hasTransferAccess && <Tab label={t('expenseApproval.tabs.transfer')} value="transfer" />}
-        </Tabs>
+      >
+        <Tab label={t('expenseApproval.tabs.written')} value="written" />
+        <Tab label={t('expenseApproval.tabs.received')} value="received" />
+        {hasTransferAccess && <Tab label={t('expenseApproval.tabs.transfer')} value="transfer" />}
+      </Tabs>
       </Card>
 
       {/* 통계 카드 */}
-      <Box sx={{
-        display: 'grid',
+      <Box sx={{ 
+        display: 'grid', 
         gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
         gap: 2.5,
-        mb: 3
+        mb: 3 
       }}>
         <Card elevation={0} sx={hvoKpiCardSx}>
           <CardContent sx={{ py: 2.25, px: 2.5, '&:last-child': { pb: 2.25 } }}>
@@ -4568,7 +6017,7 @@ const ExpenseApproval: React.FC = () => {
             px: { xs: 2, sm: 2.5 },
             py: 2,
             bgcolor: '#FFFFFF',
-            display: 'grid',
+            display: 'grid', 
             gridTemplateColumns: {
               xs: '1fr',
               sm:
@@ -4576,28 +6025,28 @@ const ExpenseApproval: React.FC = () => {
                   ? 'minmax(160px, 2fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(140px, 1.2fr) auto'
                   : 'minmax(180px, 2fr) minmax(120px, 1fr) minmax(120px, 1fr) auto',
             },
-            gap: 2,
+            gap: 2, 
             alignItems: 'flex-end',
           }}
         >
-            <TextField
-              fullWidth
-              size="small"
+              <TextField
+                fullWidth
+                size="small"
               label={t('expenseApproval.placeholders.searchSimple')}
               placeholder={
                 isRootUser && listTab === 'transfer'
                   ? t('expenseApproval.placeholders.searchWithCompany')
                   : t('expenseApproval.placeholders.search')
               }
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               InputLabelProps={{ shrink: true }}
               sx={expenseApprovalFilterFieldSx}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
                     <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                  </InputAdornment>
+                    </InputAdornment>
                 ) }}
             />
             <TextField
@@ -4605,7 +6054,7 @@ const ExpenseApproval: React.FC = () => {
               size="small"
               select
               label={t('expenseApproval.filters.status')}
-              value={statusFilter}
+                value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
                 setPage(1);
@@ -4623,6 +6072,7 @@ const ExpenseApproval: React.FC = () => {
                     const transferLabels: Record<string, string> = {
                       transfer_pending: t('expenseApproval.status.transferPending'),
                       transfer_partial: t('expenseApproval.status.partialTransfer'),
+                      awaiting_tax: t('expenseApproval.status.awaitingTaxInvoice'),
                       transfer_completed: t('expenseApproval.status.transferCompleted'),
                       transfer_failed: t('expenseApproval.status.transferFailed'),
                     };
@@ -4647,6 +6097,9 @@ const ExpenseApproval: React.FC = () => {
                     </MenuItem>,
                     <MenuItem key="transfer_partial" value="transfer_partial">
                       {t('expenseApproval.status.partialTransfer')}
+                    </MenuItem>,
+                    <MenuItem key="awaiting_tax" value="awaiting_tax">
+                      {t('expenseApproval.status.awaitingTaxInvoice')}
                     </MenuItem>,
                     <MenuItem key="transfer_completed" value="transfer_completed">
                       {t('expenseApproval.status.transferCompleted')}
@@ -4681,8 +6134,8 @@ const ExpenseApproval: React.FC = () => {
               size="small"
               select
               label={t('expenseApproval.filters.priority')}
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
               InputLabelProps={{ shrink: true }}
               SelectProps={{
                 displayEmpty: true,
@@ -4696,14 +6149,14 @@ const ExpenseApproval: React.FC = () => {
                   return priorityLabels[String(selected)] ?? String(selected);
                 } }}
               sx={expenseApprovalFilterFieldSx}
-            >
-              <MenuItem value="">{t('expenseApproval.filters.all')}</MenuItem>
-              <MenuItem value="low">{t('expenseApproval.priority.low')}</MenuItem>
-              <MenuItem value="medium">{t('expenseApproval.priority.medium')}</MenuItem>
-              <MenuItem value="high">{t('expenseApproval.priority.high')}</MenuItem>
-              <MenuItem value="urgent">{t('expenseApproval.priority.urgent')}</MenuItem>
+              >
+                <MenuItem value="">{t('expenseApproval.filters.all')}</MenuItem>
+                <MenuItem value="low">{t('expenseApproval.priority.low')}</MenuItem>
+                <MenuItem value="medium">{t('expenseApproval.priority.medium')}</MenuItem>
+                <MenuItem value="high">{t('expenseApproval.priority.high')}</MenuItem>
+                <MenuItem value="urgent">{t('expenseApproval.priority.urgent')}</MenuItem>
             </TextField>
-            {showCompanyFilter && listTab === 'transfer' && (
+            {isRootUser && listTab === 'transfer' && (
               <TextField
                 fullWidth
                 size="small"
@@ -4736,21 +6189,21 @@ const ExpenseApproval: React.FC = () => {
                 ))}
               </TextField>
             )}
-            <Button
-              variant="outlined"
+              <Button
+                variant="outlined"
               startIcon={<FilterIcon sx={{ fontSize: 18 }} />}
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('');
-                setPriorityFilter('');
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('');
+                  setPriorityFilter('');
                 setCompanyFilterId('');
                 setPage(1);
-              }}
+                }}
               sx={{ ...hvoBodyOutlinedBtnSx, height: 40, whiteSpace: 'nowrap' }}
-            >
+              >
                 {t('expenseApproval.actions.reset')}
               </Button>
-        </Box>
+            </Box>
       </Card>
 
       {/* 지출결의서 목록 테이블 */}
@@ -4860,12 +6313,12 @@ const ExpenseApproval: React.FC = () => {
                   {t('expenseApproval.columns.actions')}
                 </TableCell>
               </TableRow>
-              </TableHead>
+            </TableHead>
               <TableBody sx={hvoTableBodyRowSx}>
                 {paginatedExpenses.map((expense, index) => (
-                  <TableRow
-                    key={expense.id}
-                    onClick={() => handleViewExpense(expense)}
+                <TableRow
+                  key={expense.id}
+                  onClick={() => handleViewExpense(expense)}
                     sx={{ cursor: 'pointer', '&:active': { bgcolor: 'action.selected' } }}
                   >
                   <TableCell sx={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums', width: 52, minWidth: 52, maxWidth: 52 }}>
@@ -4878,8 +6331,8 @@ const ExpenseApproval: React.FC = () => {
                   </TableCell>
                   <TableCell sx={{ minWidth: 0 }}>
                     <Typography variant="subtitle2" fontWeight="bold" noWrap>
-                      {expense.title}
-                    </Typography>
+                        {expense.title}
+                      </Typography>
                     {isRootUser && listTab === 'transfer' && expense.companyName ? (
                       <Typography variant="caption" color="text.secondary" display="block" noWrap>
                         {expense.companyName}
@@ -4897,9 +6350,9 @@ const ExpenseApproval: React.FC = () => {
                         <PersonIcon fontSize="small" />
                       </Avatar>
                       <Typography variant="body2" fontWeight="bold" noWrap>
-                        {expense.requesterName}
-                      </Typography>
-                    </Box>
+                          {expense.requesterName}
+                        </Typography>
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={{ width: 136, minWidth: 136, maxWidth: 136 }}>
@@ -4949,6 +6402,16 @@ const ExpenseApproval: React.FC = () => {
                               <CheckCircleIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title={t('expenseApproval.actions.revisionReject')}>
+                            <IconButton
+                              size="small"
+                              onClick={() => openReasonDialog('expense-revision-reject', expense.id)}
+                              color="warning"
+                              sx={{ borderRadius: '10px' }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title={t('expenseApproval.actions.reject')}>
                             <IconButton
                               size="small"
@@ -4960,6 +6423,20 @@ const ExpenseApproval: React.FC = () => {
                             </IconButton>
                           </Tooltip>
                         </>
+                      )}
+                      {listTab === 'received'
+                        && !canUserApproveExpense(expense)
+                        && canUserRevisionRejectExpense(expense) && (
+                        <Tooltip title={t('expenseApproval.actions.revisionReject')}>
+                          <IconButton
+                            size="small"
+                            onClick={() => openReasonDialog('expense-revision-reject', expense.id)}
+                            color="warning"
+                            sx={{ borderRadius: '10px' }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                       {listTab !== 'transfer' && canDeleteExpense(expense) && (
                       <Tooltip title={t('common.delete')}>

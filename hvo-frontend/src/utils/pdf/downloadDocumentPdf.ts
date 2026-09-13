@@ -4,6 +4,7 @@ import {
   DOCUMENT_PDF_MARGINS_MM,
   DOCUMENT_PDF_SCALE_DOWNLOAD,
   DOCUMENT_PDF_SCALE_EMAIL,
+  injectDocumentPdfStandardCss,
   type DocumentPdfMarginsMm,
 } from './documentPdfStandard';
 import {
@@ -26,6 +27,7 @@ export type DownloadDocumentPdfOptions = {
   jpegQuality?: number;
   itemCount?: number;
   fitOnePageItemThreshold?: number;
+  forceFitOnePage?: boolean;
   captureRootAttr?: string;
   onClone?: (clonedDoc: Document) => void;
 };
@@ -48,6 +50,7 @@ async function captureElementToCanvas(
     backgroundColor: '#ffffff',
     logging: false,
     onclone: (clonedDoc: Document) => {
+      injectDocumentPdfStandardCss(clonedDoc);
       options.onClone?.(clonedDoc);
     },
   };
@@ -102,6 +105,7 @@ export async function downloadDocumentPdf(options: DownloadDocumentPdfOptions): 
     jpegQuality,
     itemCount: options.itemCount ?? 0,
     fitOnePageItemThreshold: options.fitOnePageItemThreshold,
+    forceFitOnePage: options.forceFitOnePage,
   });
 
   pdf.save(ensurePdfExtension(options.filename));
@@ -134,6 +138,7 @@ export async function documentPdfToBase64(
     jpegQuality,
     itemCount: options.itemCount ?? 0,
     fitOnePageItemThreshold: options.fitOnePageItemThreshold,
+    forceFitOnePage: options.forceFitOnePage,
   });
 
   const dataUri = pdf.output('datauristring') as string;

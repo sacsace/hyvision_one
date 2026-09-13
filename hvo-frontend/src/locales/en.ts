@@ -1,9 +1,8 @@
-const en = {
+export default {
   translation: {
     seo: {
-      title: 'Hyvision One - Integrated ERP for Hyvision India',
-      description:
-        'Hyvision One - Integrated ERP and system integration platform optimized for Hyvision India',
+      title: 'MVS - Integrated Business Management System',
+      description: 'MVS - Next-generation enterprise business management system',
     },
     common: {
       processing: 'Processing...',
@@ -24,6 +23,8 @@ const en = {
       previous: 'Previous',
       close: 'Close',
       open: 'Open',
+      download: 'Download',
+      openInNew: 'Open in new tab',
       refresh: 'Refresh',
       reset: 'Reset',
       settings: 'Settings',
@@ -86,28 +87,35 @@ const en = {
         quotationBody: '{{customer}} · No.{{number}}',
         approvalTitle: 'Electronic approval requested',
         approvalBody: '{{requester}} · {{title}} · {{documentId}}',
+        contractApprovalTitle: 'Employment contract approval requested',
+        contractApprovalBody: '{{employee}} · {{title}}',
+        contractSignTitle: 'Employment contract signature requested',
+        contractSignBody: '{{title}} · Signature required',
         chipPayment: 'Pay',
         chipVacation: 'Leave',
         chipQuotation: 'Quote',
-        chipApproval: 'Approval'
+        chipApproval: 'Approval',
+        chipContract: 'Contract'
       },
       selectPlaceholder: 'Select'
     },
+
     companyPolicies: {
       title: 'Company Policies',
       subtitle:
         'View employment, attendance, leave, payroll, confidentiality, POSH, and separation policies. Company admins can add or remove tabs and edit content; all changes are logged.',
       empty: 'No policies to display.',
       emptyContent: 'No content has been registered.',
-      readOnlyHint: 'Employees can view only. Adding, deleting, and editing tabs is limited to company admins.',
+      readOnlyHint: 'Employees can view only. Editing is limited to company admins.',
       version: 'Version {{version}}',
       updatedBy: 'Updated by {{name}}',
       historyTitle: 'Change history',
       historyEmpty: 'No change history yet.',
       revisionTitle: 'Version {{version}} content',
-      addTabHint: 'New tabs need Korean and English titles. Add content afterward with Edit.',
+      addTabTitle: 'Add policy tab',
+      addTabHint: 'Enter Korean and English titles to add a tab. You can write the content afterwards.',
       confirmDeleteTab:
-        'Delete the “{{name}}” tab? It will be hidden from the list; history is kept.',
+        'Delete the “{{name}}” tab? It is hidden from the list only and can be restored by adding it again with the same key.',
       tabs: {
         employment: 'Employment Policy',
         attendance: 'Attendance Policy',
@@ -129,24 +137,25 @@ const en = {
         edit: 'Edit',
         save: 'Save',
         history: 'History',
-        viewRevision: 'View content',
+        viewRevision: 'View',
         addTab: 'Add tab',
         deleteTab: 'Delete tab',
       },
       success: {
         saved: 'Company policy saved.',
-        created: 'Policy tab added.',
+        added: 'Policy tab added.',
         deleted: 'Policy tab deleted.',
       },
       errors: {
         loadFailed: 'Failed to load company policies.',
         saveFailed: 'Failed to save company policy.',
         historyFailed: 'Failed to load change history.',
-        createFailed: 'Failed to add policy tab.',
+        addFailed: 'Failed to add policy tab.',
         deleteFailed: 'Failed to delete policy tab.',
         titleRequired: 'Please enter both Korean and English titles.',
       },
     },
+
     app: {
       accountingTitle: 'Accounting',
       accountingDesc: 'This page provides comprehensive accounting and financial management features.',
@@ -176,7 +185,7 @@ const en = {
       serverError: 'Server error occurred.'
     },
     dashboard: {
-      title: 'Hyvision One Dashboard',
+      title: 'MVS Dashboard',
       welcome: 'Hello, {{name}}! Have a great day.',
       totalUsers: 'Total Users',
       activeProjects: 'Active Projects',
@@ -191,7 +200,7 @@ const en = {
       normal: 'Normal',
       optimal: 'Optimal',
       active: 'Active',
-      enterpriseFeatures: 'Hyvision One - Next-Generation Enterprise Integrated Business Management System',
+      enterpriseFeatures: 'MVS - Next-Generation Enterprise Integrated Business Management System',
       multiTenant: 'Multi-Tenant Architecture',
       enterpriseSecurity: 'Enterprise Security',
       realtimeCollaboration: 'Real-time Collaboration',
@@ -430,7 +439,7 @@ const en = {
     },
     userManagement: {
       title: 'User Management',
-      description: 'Manage Hyvision One system user accounts.',
+      description: 'Manage MVS system user accounts.',
       userList: 'User List',
       addUser: 'Add User',
       departmentTab: 'Department Management',
@@ -458,11 +467,9 @@ const en = {
         noResults: 'No users match your filters.',
         noResultsHint: 'Try changing your search or reset filters.',
       },
-      excelSample: 'Bulk sample',
+      excelSample: 'Excel Sample',
       excelExport: 'Export Excel',
-      excelImport: 'Bulk register',
-      bulkRegisterHint:
-        'Download the sample Excel, fill it in, then upload to register multiple users at once. Required: User ID, Name, Email, Password. Missing departments are created automatically. Soft-deleted accounts are restored; only active duplicates are skipped.',
+      excelImport: 'Import Excel',
       search: 'Search by name, email, employee number...',
       company: 'Company',
       allCompanies: 'All',
@@ -558,10 +565,10 @@ const en = {
       otEligible: 'Eligible for OT',
       otEligibleYes: 'Yes',
       otEligibleNo: 'No',
-      pfCalcMode: 'PF calculation',
-      pfCalcModeCap1800: 'Cap 1,800',
-      pfCalcModeBasic12: 'Basic × 12%',
-      pfCalcModeTotal12: 'Total salary × 12%',
+      pfCap: 'PF ceiling',
+      pfCap1800: 'Cap at 1,800',
+      pfCap12pct: '12% of basic',
+      pfCapTotal12pct: '12% of total (50/50 split)',
       careerHint: 'Add previous work experience. Only rows with a company name are saved.',
       careerCompany: 'Company',
       careerPosition: 'Position',
@@ -621,7 +628,7 @@ const en = {
       submitRegister: 'Register',
       userDetailTitle: 'User Details',
       personalRecordTitle: 'Employee Personal Record',
-      downloadPersonalRecordPdf: 'Download Personal Record PDF',
+      downloadPersonalRecordPdf: 'Personal Record PDF',
       personalRecordGeneratedAt: 'Generated on',
       personalRecordPdfDone: 'Employee personal record PDF downloaded.',
       personalRecordPdfFailed: 'Failed to download employee personal record PDF.',
@@ -635,17 +642,14 @@ const en = {
       excelExportError: 'Failed to export Excel file.',
       excelSelectFile: 'Please select an Excel file.',
       excelImportError: 'Failed to import Excel file.',
-      excelImportTitle: 'Bulk register new users',
-      excelImportDesc:
-        'Select an Excel (.xlsx) file matching the sample template. Missing departments/job titles are created automatically. Soft-deleted users are restored; only active email or user ID duplicates are skipped.',
+      excelImportTitle: 'Import Excel File',
       selectedFile: 'Selected file',
       importResultTitle: 'Import result',
       importSuccessSummary: '{{success}} of {{total}} succeeded',
       importFailedCount: 'Failed: {{count}}',
-      importSkippedCount: 'Skipped duplicates: {{count}}',
       importRowError: 'Row {{row}}: {{error}}',
-      importing: 'Registering...',
-      importButton: 'Bulk register',
+      importing: 'Importing...',
+      importButton: 'Import',
       excelSampleFilename: 'user_import_sample',
       excelExportFilename: 'user_list'
     },
@@ -709,7 +713,7 @@ const en = {
       personalViewNotice: 'HeresNow sync/mapping is managed on the Attendance Statistics page. This page shows only the logged-in user attendance.',
       heresnowManualClockDisabled: 'HeresNow integration is active. Clock-in/out must be done in HeresNow; you can only view your own records here.',
       noTodayAttendanceHeresnow: 'No HeresNow clock-in/out for today. Records will appear here after sync from HeresNow.',
-      heresnowDescription: 'Import clock-in/out records from HeresNow (www.heresnow.in) into Hyvision One attendance.',
+      heresnowDescription: 'Import clock-in/out records from HeresNow (www.heresnow.in) into MVS attendance.',
       heresnowActive: 'Integration active',
       heresnowInactive: 'Integration inactive',
       heresnowSync: 'Sync from HeresNow',
@@ -743,13 +747,79 @@ const en = {
     },
     employmentContractManagement: {
       pageTitle: 'Employment Contract Management',
-      description: 'Register templates, send contracts to employees, collect signatures, and save signed contracts as PDF.',
+      description:
+        'Create contract → select employee → choose approver → enter details → preview → submit for approval → employee signs → complete.',
       reset: 'Reset',
       company: 'Company',
       tabs: {
         contracts: 'Contracts',
         templates: 'Templates',
         my: 'My contracts',
+        approvals: 'Approvals',
+      },
+      wizard: {
+        title: 'Create employment contract',
+        step1: '1. Create',
+        step2: '2. Employee',
+        step3: '3. Approver',
+        step4: '4. Basic info',
+        step5: '5. Preview',
+        step6: '6. Submit',
+        next: 'Next',
+        back: 'Back',
+        saveDraft: 'Save draft',
+        submitApproval: 'Submit to approver',
+        previewHint: 'Review the contract details before submitting to the approver.',
+        needTemplate: 'Please select a template and enter a title.',
+        needEmployee: 'Please select an employee.',
+        needApprover: 'Please select an approver (different from the employee).',
+        needBasic: 'Please enter start and end dates.',
+      },
+      actions: {
+        approve: 'Approve',
+        reject: 'Reject',
+        complete: 'Complete',
+        submitApproval: 'Submit for approval',
+        sign: 'Sign',
+      },
+      statusLabel: 'Status',
+      actionsLabel: 'Actions',
+      titleEnglishOnly: 'Enter the contract title in English.',
+      contractBody: 'Contract body',
+      detailTitle: 'Contract details',
+      close: 'Close',
+      noBody: 'No contract body is registered.',
+      noDetail: 'No contract details available.',
+      salary: 'Salary',
+      workLocation: 'Work location',
+      workingDays: 'Working days',
+      workingHours: 'Working hours',
+      employee: 'Employee',
+      approver: 'Approver',
+      period: 'Period',
+      contractTitle: 'Title',
+      rejectionReason: 'Rejection reason',
+      rejectReasonRequired: 'A comment is required when rejecting.',
+      rejectionReasonPlaceholder: 'Enter rejection reason...',
+      status: {
+        draft: 'Draft',
+        pending_approval: 'Pending approval',
+        in_review: 'In review',
+        rejected: 'Rejected',
+        awaiting_company_sign: 'Awaiting company signature',
+        awaiting_employee_sign: 'Awaiting employee signature',
+        signed: 'Signed',
+        active: 'Completed',
+        expired: 'Expired',
+        terminated: 'Terminated',
+      },
+      success: {
+        submitted: 'Submitted to approver.',
+        approved: 'Approved. The contract is now visible on the employee’s My contracts.',
+        rejected: 'Contract rejected.',
+        completed: 'Contract marked complete.',
+        signed: 'Signature completed.',
+        deleted: 'Contract deleted.',
       },
       stats: {
         totalContracts: 'Total contracts',
@@ -759,6 +829,7 @@ const en = {
         myTotal: 'My contracts',
         myInProgress: 'In progress',
         myCompleted: 'Completed',
+        pendingApprovals: 'Pending approvals',
       },
       empty: {
         loading: 'Loading data...',
@@ -766,9 +837,12 @@ const en = {
         noTemplates: 'No templates yet.',
         noMyContracts: 'You have no contracts yet.',
         noCompletedContracts: 'No completed contracts.',
-        noMyContractsHint: 'Contracts assigned to you will appear here.',
+        noMyContractsHint: 'After approver approval, contracts assigned to you appear here for signing.',
         noContractsHint: 'Use Create contract to add your first contract.',
         noTemplatesHint: 'Use Create template to add your first template.',
+        noApprovals: 'No contracts waiting for your approval.',
+        noSearchResults: 'No search results.',
+        noSearchResultsHint: 'Try a different search term.',
       },
       createContract: 'Create contract',
       createTemplate: 'Create template',
@@ -780,6 +854,8 @@ const en = {
       filterAll: 'All',
       filterInProgress: 'In progress',
       filterCompleted: 'Completed',
+      search: 'Search',
+      searchPlaceholder: 'Search by title, name, ID, or status',
       pdfFiles: 'PDF files',
       myPdfFiles: 'My PDF files',
       noPdfFiles: 'No PDF files have been generated.',
@@ -790,8 +866,17 @@ const en = {
       aadhaarCompanySignHint: 'Complete company e-signature after Aadhaar verification.',
       pdfSaved: 'Contract saved as PDF.',
       pdfSaveFailed: 'Failed to save PDF.',
-      aadhaarSignSuccess: 'Aadhaar e-Verify signature completed.',
-      aadhaarSignFailed: 'An error occurred during Aadhaar e-Verify.',
+      aadhaarSignSuccess: 'Aadhaar eSign signature completed.',
+      aadhaarSignFailed: 'An error occurred during Aadhaar eSign.',
+      aadhaarAspSteps:
+        '1) Last 4 digits + consent → 2) Start Aadhaar auth → 3) Mock OTP (dev) or ASP page → 4) Complete. Live mode needs ASP contract + env.',
+      aadhaarLast4Hint: 'Hint for ASP identity. Real verification uses OTP/biometrics via ASP.',
+      aadhaarStart: 'Start Aadhaar auth',
+      aadhaarComplete: 'Complete signature',
+      aadhaarMockOtp: 'Mock OTP (6 digits)',
+      aadhaarMockOtpHint: 'Mock ASP session. Enter any 6-digit OTP.',
+      aadhaarLiveHint: 'After ASP authentication, click Complete signature.',
+      aadhaarInitiated: 'Aadhaar session started.',
     },
     noticePoll: {
       title: 'Poll',
@@ -899,7 +984,7 @@ const en = {
     companyManagement: {
       title: 'Company Management',
       pageTitle: 'Company Information Management',
-      description: 'Manage the list of companies that can use the Hyvision One system.',
+      description: 'Manage the list of companies that can use the MVS system.',
       search: 'Search by company name, business number, CEO name...',
       searchPlaceholder: 'Search by company name, business number, representative, industry...',
       companyName: 'Company Name',
@@ -950,11 +1035,11 @@ const en = {
       noCompanies: 'No companies found.',
       noCompaniesMatch: 'No companies match the search criteria.',
       noActiveCompanies: 'No companies with active status.',
-      noCompaniesTitle: 'There are no companies that can use the Hyvision One system',
+      noCompaniesTitle: 'There are no companies that can use the MVS system',
       active: 'Active',
       inactive: 'Inactive',
       suspended: 'Suspended',
-      hvoUsageCompanies: 'Hyvision One Usage Companies',
+      mvsUsageCompanies: 'MVS Usage Companies',
       totalCompanies: 'Total Companies',
       basicPlan: 'Basic Plan',
       premiumPlan: 'Premium Plan',
@@ -964,9 +1049,9 @@ const en = {
       planStandard: 'Standard',
       planPremium: 'Premium',
       planEnterprise: 'Enterprise',
-      companyListTitle: 'Hyvision One System Company List ({{count}})',
+      companyListTitle: 'MVS System Company List ({{count}})',
       companyInfo: 'Company Information',
-      hvoUsagePeriod: 'Hyvision One Usage Period',
+      mvsUsagePeriod: 'MVS Usage Period',
       close: 'Close',
       saving: 'Saving...',
       addNewCompany: 'Add New Company',
@@ -1026,10 +1111,6 @@ const en = {
       typeCustomerPartner: 'Customer + Partner',
       typeOther: 'Other',
       companyInfo: 'Company Information',
-      sectionBasic: 'Basic Information',
-      sectionContact: 'Contact',
-      sectionBank: 'Bank Details',
-      sectionContract: 'Contract & Status',
       representative: 'Representative',
       industry: 'Industry',
       contact: 'Contact',
@@ -1042,6 +1123,10 @@ const en = {
       viewPartner: 'View Partner Information',
       editPartner: 'Edit Partner Information',
       addNewPartner: 'Add New Partner',
+      sectionBasic: 'Basic Information',
+      sectionContact: 'Contact',
+      sectionBank: 'Bank Account',
+      sectionContract: 'Contract & Status',
       companyName: 'Company Name',
       businessNumber: 'CIN',
       panNumber: 'PAN Number',
@@ -1083,7 +1168,7 @@ const en = {
       placeholderBusinessNumber: 'CIN (optional)',
       placeholderPan: 'Enter PAN number',
       placeholderGst: 'Enter GST number {{index}}',
-      placeholderGstRequired: 'GST number (optional)',
+      placeholderGstRequired: 'Please enter GST number',
       placeholderRepresentative: 'Enter representative name',
       placeholderIndustry: 'Enter industry',
       placeholderWebsite: 'Enter website URL',
@@ -1116,7 +1201,7 @@ const en = {
     },
     menuPermissionManagement: {
       title: 'Menu Permission Management',
-      description: 'Manage menu access permissions by user with Root privileges.',
+      description: 'Manage menu access permissions by company and user with Root privileges.',
       select: 'Select',
       userSearch: 'User Search',
       userSearchPlaceholder: 'Search by name, role...',
@@ -1141,8 +1226,8 @@ const en = {
       permissionDelegation: 'Permission Delegation',
       loading: 'Loading...',
       noMenus: 'No menus found.',
-      selectUserOrCompany: 'Please select a user.',
-      emptyPanelHint: 'Choose a user in the list on the left to edit menu permissions.',
+      selectUserOrCompany: 'Please select a user or company.',
+      emptyPanelHint: 'Choose a user or company in the list on the left to edit menu permissions.',
       permissionsSaved: 'Permissions saved successfully.',
       permissionsSaveFailed: 'Failed to save permissions.',
       companyPermissionsSaved: 'Permissions saved for {{count}} users.',
@@ -1194,7 +1279,7 @@ const en = {
     loginInfoManagement: {
       title: 'Login credentials',
       description:
-        'Per company, store login IDs, passwords, and URLs for external sites (tax, banking, MCA/corporate registry); separate from Hyvision One login accounts.',
+        'Per company, store login IDs, passwords, and URLs for external sites (tax, banking, MCA/corporate registry); separate from MSV login accounts.',
       excelHint:
         'Edits save when you leave the cell. You can paste from Excel. Division, Login ID, and Password are required to save.',
       moreTools: 'Tools',
@@ -1339,7 +1424,7 @@ const en = {
     },
     systemSettings: {
       pageTitle: 'System settings',
-      pageDescription: 'Manage global Hyvision One settings such as language, theme, notifications, security, and mail server.',
+      pageDescription: 'Manage global MVS settings such as language, theme, notifications, security, and mail server.',
       stats: {
         language: 'Language',
         theme: 'Theme',
@@ -1357,7 +1442,7 @@ const en = {
       },
       general: {
         companyAbbreviation: 'Company abbreviation (email subject)',
-        companyAbbreviationHint: 'Used in quotation emails as [HVO]. Example: HVO'
+        companyAbbreviationHint: 'Used in quotation emails as [MSV]. Example: MSV'
       },
       tabs: {
         basic: 'General',
@@ -1450,7 +1535,7 @@ const en = {
       payslipSendSystem: {
         title: 'Payslip Delivery',
         description:
-          'Upload a payroll list, review the data, and email each employee a PDF payslip. The Excel file is not saved. If the email matches an Hyvision One user, the payslip is also stored under My Payslips.',
+          'Upload a payroll list, review the data, and email each employee a PDF payslip. The Excel file is not saved. If the email matches an MVS user, the payslip is also stored under My Payslips.',
         completeOnlyHint:
           'Only finalized pay months can be sent. Finalize the payroll in Payroll Management, then send each employee’s payslip here.',
         unfinalizedMonthHint:
@@ -1459,6 +1544,10 @@ const en = {
           'Header rows and column order may differ by company. After upload, review auto-mapping and the pay month (YYYY-MM).',
         uploadSection: 'Excel upload',
         uploadButton: 'Upload payroll Excel',
+        senderCompany: 'Sending company',
+        senderCompanyPlaceholder: 'Select company',
+        senderCompanyHelper: 'Root can choose which company to use for PDF, mail, and {{company}}.',
+        selectCompanyRequired: 'Please select the sending company.',
         payMonth: 'Pay month',
         payMonthHelper: 'Detected from the sheet title. Edit if needed.',
         mappingSection: '1. Review Excel header mapping',
@@ -1491,7 +1580,7 @@ const en = {
         formulaDetected: '({{count}} formula columns — using calculated values; formulas shown in mapping)',
         formulaSample: 'Formula',
         sendDone: 'Send complete: {{ok}} succeeded / {{fail}} failed',
-        sendSaved: ' ({{saved}} saved to Hyvision One My Payslips)',
+        sendSaved: ' ({{saved}} saved to MVS My Payslips)',
         issues: {
           missingName: 'Missing name',
           invalidEmail: 'Invalid email',
@@ -1589,11 +1678,6 @@ const en = {
         companyName: 'Company',
         companyContact: 'Company contact',
         downloadPdf: 'Download PDF',
-        downloadAllTitle: 'Download all payslips',
-        downloadAllProgress: 'Generating payslips {{current}}/{{total}}…',
-        downloadAllDone: 'Downloaded payslip ZIP ({{count}} files).',
-        downloadAllFailed: 'Failed to download payslip ZIP.',
-        downloadAllNoRows: 'No payroll rows to download. Check the pay month.',
         sendTitle: 'Send payslips',
         sendRequiresComplete:
           'Complete “Payroll generation” for the selected pay month before sending. (Uses the pay month in the payroll dialogs.)',
@@ -1695,7 +1779,6 @@ const en = {
         createPayroll: 'Create Payroll',
         completePayroll: 'Finalize payroll',
         exportExcel: 'Export to Excel',
-        uploadExcel: 'Upload Excel',
         addColumn: 'Add column',
         reorderColumns: 'Column order',
         resetColumnOrder: 'Reset order',
@@ -1772,7 +1855,6 @@ const en = {
         deleted: 'Payroll item deleted successfully.',
         saved: 'Saved.',
         exportedExcel: 'Excel file saved.',
-        importedExcel: 'Payroll Excel imported.',
         bulkCreated: 'Payroll generated.',
         approved: 'Payroll approved successfully.',
         paid: 'Payroll paid successfully.',
@@ -1796,51 +1878,7 @@ const en = {
         payFailed: 'Failed to pay payroll.',
         payError: 'An error occurred while paying payroll.',
         exportFailed: 'Failed to export Excel.'
-      },
-      excelImport: {
-        title: 'Upload payroll Excel',
-        hint: 'Saves matched employee payroll for {{period}}. Email is preferred; otherwise employee number is used.',
-        selectFile: 'Choose Excel file',
-        emptyHint: 'Select an .xlsx file to preview rows.',
-        confirm: 'Import',
-        noRows: 'No payroll rows to import.',
-        noSheet: 'No readable sheet found.',
-        parseFailed: 'Could not read the Excel file. Please use .xlsx.',
-        importFailed: 'Failed to import payroll Excel.',
-        resultSummary: 'Created {{created}} / replaced {{replaced}} / skipped {{skipped}}',
-        colRow: 'Row',
-        colName: 'Name',
-        colEmail: 'Email',
-        colMatch: 'Match',
-        colNet: 'Net pay',
-        colReason: 'Reason',
-        skipReasons: {
-          missing_email_and_emp_id: 'Missing email and emp ID',
-          no_matching_user: 'No matching user',
-          duplicate_employee: 'Duplicate employee in file',
-        },
-      },
-    },
-    myPayrollList: {
-      title: 'My Payroll',
-      description: 'View payroll records matched to your account.',
-      period: 'Pay month',
-      search: 'Search',
-      columns: {
-        period: 'Pay month',
-        gross: 'Gross',
-        net: 'Net pay',
-        status: 'Status',
-        paymentDate: 'Payment date',
-      },
-      empty: {
-        loading: 'Loading payroll list…',
-        noItems: 'No payroll records to show.',
-        noItemsHint: 'Records appear after HR uploads Excel or creates payroll.',
-      },
-      errors: {
-        loadFailed: 'Failed to load payroll list.',
-      },
+      }
     },
     departmentManagement: {
       title: 'Departments',
@@ -1925,6 +1963,55 @@ const en = {
       deleted: 'Deleted.',
       selectCompanyFirst: 'Please select a company.',
       selectCompanyHint: 'Job titles are registered per company. Select a company first.',
+    },
+    workAssigneeList: {
+      title: 'Client List',
+      description: 'Assign clients by person. Drag cards to move them to another assignee.',
+      empty: 'No assignees yet. Add an assignee to get started.',
+      actions: {
+        addAssignee: 'Add Assignee',
+        reorder: 'Reorder',
+        highlightedOn: 'Remove highlight',
+        highlightedOff: 'Highlight',
+      },
+      search: {
+        userLabel: 'Search company users',
+        userPlaceholder: 'Search by name, title, or email',
+        userHint: 'Search users in your logged-in company. Selecting one fills the fields below.',
+        noUsers: 'No matching users.',
+        partnerPlaceholder: 'Search client company or type manually',
+        partnerHint:
+          'Search partners/clients registered to your company, or type a custom name. Clients already assigned to another person are unavailable.',
+        noPartners: 'No available clients. Type a name or check other assignees.',
+        boardPlaceholder: 'Search assignee, client, or note',
+        boardResult: '{{count}} clients · {{columns}} assignees',
+        noBoardResults: 'No matching results.',
+      },
+      fields: {
+        name: 'Name',
+        title: 'Job Title',
+        email: 'Email',
+        companyName: 'Assigned Client',
+        note: 'Note (optional)',
+      },
+      dialog: {
+        addAssignee: 'Add Assignee',
+        editAssignee: 'Edit Assignee',
+        addCompany: 'Add Client',
+        editCompany: 'Edit Client',
+      },
+      confirm: {
+        deleteAssigneeTitle: 'Delete Assignee',
+        deleteAssigneeBody: 'Delete "{{name}}" and all assigned companies?',
+        deleteItemTitle: 'Delete Client',
+        deleteItemBody: 'Delete "{{name}}"?',
+      },
+      errors: {
+        loadFailed: 'Failed to load the list.',
+        nameRequired: 'Please enter an assignee name.',
+        companyRequired: 'Please enter an assigned client.',
+        companyDuplicate: 'This client is already assigned to "{{name}}".',
+      },
     },
     workBoards: {
       title: 'Work Management',
@@ -2081,7 +2168,9 @@ const en = {
         processingTimeChart: 'Bars show the selected metric (median/average). Error bars show min-max range. Dashed line is team median.',
         durationDistribution: 'Distribution of completed card processing times by duration bucket.',
         processingTimeDetail: 'Median, average, min, max, and standard deviation per assignee.',
-        personalEfficiencyChart: 'Composite score from completion rate, on-time rate, monthly throughput, and overdue cards.'
+        personalEfficiencyChart: 'Composite score from completion rate, on-time rate, monthly throughput, and overdue cards.',
+        onTimeRate:
+          'On-time completed cards ÷ (completed cards with a due date + currently overdue open cards). Overdue cards lower this rate.'
       },
       status: {
         todo: 'To Do',
@@ -2952,7 +3041,7 @@ const en = {
       gst: {
         title: 'GST Compliance Status',
         irpWorkflow:
-          'A legal IRN is issued by the Invoice Registration Portal (IRP). Hyvision One builds NIC-schema JSON and submits it. Default (GST_IRP_MODE=mock) simulates the response. For production, contract a GSP and set GST_GSP_BASE_URL and related env vars.',
+          'A legal IRN is issued by the Invoice Registration Portal (IRP). MVS builds NIC-schema JSON and submits it. Default (GST_IRP_MODE=mock) simulates the response. For production, contract a GSP and set GST_GSP_BASE_URL and related env vars.',
         checklist: {
           title: 'GST Compliance Checklist',
           gstinValidationPrimary: 'GSTIN Validation',
@@ -3268,7 +3357,7 @@ const en = {
     gsEncCostAnalysis: {
       title: 'GS E&C Cost Analysis',
       subtitle:
-        'Match GAS chart of accounts with Tally cumulative ledger for cost review. (browser local only) Spot tool — data is not saved to the server DB.',
+        'Match GAS chart of accounts with Tally cumulative ledger for cost review. (browser local only) Spot tool — data is not saved to the server DB. If mapping looks wrong, use Reset learned mapping then re-import/rematch.',
       spotNotice:
         'Uploaded GAS accounts and cumulative ledger (Journal) Excel files are stored on this PC browser only.',
       tabs: {
@@ -3282,8 +3371,10 @@ const en = {
         appendLedger: 'Append monthly import (Excel/PDF)',
         rematch: 'Rematch Korean names',
         clearAccounts: 'Delete all accounts',
+        clearTallyMap: 'Reset learned mapping',
         clearLocal: 'Clear local data',
         exportExcel: 'Download Excel',
+        showMore: 'Show more ({{shown}} / {{total}})',
       },
       searchPlaceholder: 'Search account, Korean name, narration, client',
       matchFilter: 'Match',
@@ -3342,6 +3433,7 @@ const en = {
       stats: {
         accounts: '{{count}} accounts',
         ledger: '{{count}} rows · matched {{matched}} / unmatched {{unmatched}} · INR {{inr}}',
+        showingPartial: '(showing {{shown}} / {{total}})',
       },
       empty: {
         accounts: 'Upload the GAS standard chart Excel file.',
@@ -3350,9 +3442,11 @@ const en = {
       },
       success: {
         gasLoaded: 'Loaded {{count}} GAS accounts.',
-        ledgerLoaded: 'Imported {{count}} ledger rows (total {{total}}).',
-        rematched: 'Korean names rematched from GAS accounts.',
+        ledgerLoaded: 'Imported {{count}} ledger rows · mapped {{mapped}} / {{total}}.',
+        rematched: 'Korean names remapped from prior ledger and GAS. (mapped {{mapped}} / {{total}})',
         accountsCleared: 'All GAS accounts deleted.',
+        tallyMapCleared:
+          'Cleared Tally↔HQ learned mapping and rematched ledger rows. If bad labels remain, edit cells then run Rematch.',
         cleared: 'Local cost-analysis data cleared.',
         excelDownloaded: 'Excel file downloaded.',
       },
@@ -3372,7 +3466,7 @@ const en = {
     tallyImport: {
       title: 'Load Tally Data',
       description:
-        'Review a Tally Export (XML/JSON), then convert it into Hyvision One draft vouchers.',
+        'Review a Tally Export (XML/JSON), then convert it into MVS draft vouchers.',
       wizard: {
         upload: 'File upload',
         inspect: 'Structure check',
@@ -3386,7 +3480,7 @@ const en = {
         uploadHint: 'Supported formats: XML, JSON · Max 2GB. Files are not kept on the server after structure check.',
         inspectTitle: '2. Structure check',
         mappingTitle: '3. Import options',
-        mappingHint: 'Choose what to import from Tally and how unmatched ledgers/parties should be created in Hyvision One.',
+        mappingHint: 'Choose what to import from Tally and how unmatched ledgers/parties should be created in MVS.',
         reviewTitle: '4. Review errors',
         reviewClean: 'No errors in the current validation scope. Review vouchers below, then run import.',
         previewTitle: '5. Voucher preview',
@@ -3403,7 +3497,7 @@ const en = {
       dryRun: 'Simulate',
       import: 'Run import',
       reconciliation: 'Check migration reconciliation',
-      reconciliationPass: 'The current migrated voucher movements match between Tally source and Hyvision One draft vouchers.',
+      reconciliationPass: 'The current migrated voucher movements match between Tally source and MVS draft vouchers.',
       reconciliationFail: 'Reconciliation differences were found. Review the report and source vouchers before proceeding.',
       previewTab: 'Parse preview',
       reportTab: 'Report',
@@ -3440,7 +3534,7 @@ const en = {
         info: 'Info',
       },
       hint:
-        'Tally: Gateway of Tally → Export → XML (Masters / Vouchers or Day Book). Already-imported vouchers (HVO no., GUID, Tally no.+date) and in-file duplicates are skipped. Accounts/parties are reused by name/GUID/GSTIN. Post from General Ledger. Issues from import, simulate, and preview are accumulated in the Report tab.',
+        'Tally: Gateway of Tally → Export → XML (Masters / Vouchers or Day Book). Already-imported vouchers (MSV no., GUID, Tally no.+date) and in-file duplicates are skipped. Accounts/parties are reused by name/GUID/GSTIN. Post from General Ledger. Issues from import, simulate, and preview are accumulated in the Report tab.',
       options: {
         importLedgers: 'Import ledgers',
         importVouchers: 'Import vouchers',
@@ -3473,7 +3567,7 @@ const en = {
       reconciliationColumns: {
         check: 'Check',
         source: 'Tally source',
-        hvo: 'Hyvision One',
+        mvs: 'MVS',
         difference: 'Difference',
         status: 'Status',
       },
@@ -3870,8 +3964,8 @@ const en = {
     },
     purchaseSalesStats: {
       title: 'Purchasing & Sales Statistics',
-      description: 'Aggregates purchases and sales from tax invoices and expense reports issued in Hyvision One. Separate from Tally data.',
-      infoAlert: 'Sales are based on Hyvision One tax invoices (standard and e-invoice); purchases are based on paid expense reports. Tally import data is not included.',
+      description: 'Aggregates purchases and sales from tax invoices and expense reports issued in MVS. Separate from Tally data.',
+      infoAlert: 'Sales are based on MVS tax invoices (standard and e-invoice); purchases are based on paid expense reports. Tally import data is not included.',
       downloadReport: 'Download Report',
       filters: {
         company: 'Company',
@@ -4020,7 +4114,7 @@ const en = {
         q4: 'Q4',
         fiscalYear: 'Full Fiscal Year'
       },
-      hint: 'Sheet totals are calculated from the same Hyvision One aggregates (BS / P&L / Trial Balance). Schedule totals feed the main statements.',
+      hint: 'Sheet totals are calculated from the same MVS aggregates (BS / P&L / Trial Balance). Schedule totals feed the main statements.',
       unbalancedHint: 'Assets do not equal liabilities + equity. Check Tally account mapping and vouchers.',
       formula: 'Assets {{assets}} = Liabilities + Equity {{liabilityEquity}}',
       imbalancePanel: {
@@ -4374,12 +4468,12 @@ const en = {
       accountLabel: 'Account'
     },
     expenseApproval: {
-      title: 'Expense Reports',
+      title: 'Expense reports',
       unknown: 'Unknown',
       tabs: {
-        written: 'My Requests',
-        received: 'Requests Received',
-        transfer: 'Remittance List'
+        written: 'My requests',
+        received: 'Requests received',
+        transfer: 'Remittance list'
       },
       list: {
         remainingShort: 'Remaining: {{currency}} {{amount}}'
@@ -4390,22 +4484,23 @@ const en = {
       },
 
       actions: {
-        requestExpense: 'Submit Expense Request',
+        requestExpense: 'Submit expense request',
         reset: 'Reset',
         view: 'View',
         editDetail: 'Edit',
-        transferLog: 'Transfer Log',
+        transferLog: 'Transfer log',
         approve: 'Approve',
         accept: 'Accept',
         reject: 'Reject',
+        revisionReject: 'Reject for correction',
         resubmit: 'Re-request',
-        backToList: 'Back to List'
+        backToList: 'Back to list'
       },
       filters: {
         status: 'Status',
         priority: 'Priority',
         all: 'All',
-        paymentApprovedOnly: 'Approved for Payment Only',
+        paymentApprovedOnly: 'Approved for payment only',
         company: 'Company',
         allCompanies: 'All companies'
       },
@@ -4416,26 +4511,28 @@ const en = {
         searchWithCompany: 'Search by title, requester, or company'
       },
       form: {
-        createTitle: 'Create Expense Report',
-        editTitle: 'Edit Expense Report'
+        createTitle: 'Create expense report',
+        editTitle: 'Edit expense report'
       },
       summary: {
-        totalExpense: 'Total Requested Amount',
-        approvedAmount: 'Approved Amount',
-        pendingAmount: 'Outstanding Amount',
-        urgentRequests: 'Urgent Requests'
+        totalExpense: 'Total requested amount',
+        approvedAmount: 'Approved amount',
+        pendingAmount: 'Outstanding amount',
+        urgentRequests: 'Urgent requests'
       },
       status: {
         draft: 'Draft',
         submitted: 'Submitted',
-        inReview: 'In Review',
+        inReview: 'In review',
         approved: 'Approved',
         rejected: 'Rejected',
-        paid: 'Payment Completed',
-        transferPending: 'Awaiting Payment',
-        partialTransfer: 'Partially Paid',
-        transferCompleted: 'Remittance Completed',
-        transferFailed: 'Payment Failed'
+        revisionRejected: 'Rejected for correction',
+        paid: 'Payment completed',
+        awaitingTaxInvoice: 'Awaiting tax invoice',
+        transferPending: 'Awaiting payment',
+        partialTransfer: 'Partially paid',
+        transferCompleted: 'Remittance completed',
+        transferFailed: 'Payment failed'
       },
       priority: {
         low: 'Low',
@@ -4445,43 +4542,59 @@ const en = {
       },
       columns: {
         no: 'No.',
-        expenseInfo: 'Expense Details',
+        expenseInfo: 'Expense details',
         requester: 'Requester',
         approver: 'Approver',
         company: 'Company',
         amount: 'Amount',
         status: 'Status',
         priority: 'Priority',
-        submittedAt: 'Submitted Date',
-        createdAt: 'Date Created',
+        submittedAt: 'Submitted date',
+        createdAt: 'Date created',
         actions: 'Actions'
       },
       dialog: {
-        deleteTitle: 'Delete Expense Report',
+        deleteTitle: 'Delete expense report',
         deleteMessage: 'Are you sure you want to delete this expense report?',
-        uploadByPhoneTitle: 'Upload Receipt via Mobile',
-        finalApproveReasonTitle: 'Final Approval Reason',
-        rejectReasonTitle: 'Rejection Reason',
+        uploadByPhoneTitle: 'Upload receipt via mobile',
+        finalApproveReasonTitle: 'Final approval reason',
+        rejectReasonTitle: 'Rejection reason',
+        revisionRejectReasonTitle: 'Reason for correction',
+        editReasonTitle: 'Edit reason',
         finalApproveReasonPlaceholder: 'Approval reason (optional)',
         rejectReasonPlaceholder: 'Enter rejection reason',
-        executePaymentTitle: 'Make Payment',
-        retryTransferTitle: 'Retry Payment',
+        revisionRejectReasonPlaceholder: 'Describe what needs to be corrected',
+        editReasonPlaceholder: 'Enter reason for this edit',
+        executePaymentTitle: 'Make payment',
+        retryTransferTitle: 'Retry payment',
         paymentAmount: 'Payment amount',
         paymentAmountHint:
           'Total {{currency}} {{total}} / Paid {{currency}} {{paid}} / Remaining: {{currency}} {{remaining}}',
         remittanceProof: 'Payment proof',
         remittanceProofUpload: 'Choose proof file',
+        remittanceProofChange: 'Change file',
+        remittanceProofRenameTitle: 'Click to rename file',
+        remittanceProofRenameHint: 'Press Enter to save, Esc to cancel',
         remittanceProofHint:
           'Upload a bank transfer confirmation image or PDF. You can also paste a captured image with Ctrl+V.',
       },
       detail: {
-        title: 'Expense Report Details',
-        expenseNo: 'Expense No.',
-        requesterInfo: 'Requester Information',
-        purpose: 'Expense Purpose',
-        items: 'Expense Items',
-        approvalFlow: 'Approval Flow',
+        title: 'Expense report details',
+        expenseNo: 'Expense no.',
+        requesterInfo: 'Requester information',
+        purpose: 'Expense purpose',
+        items: 'Expense items',
+        approvalFlow: 'Approval flow',
         attachments: 'Attachments',
+        attachmentFileName: 'Attachment file name',
+        attachmentFileNameHint: 'Used when downloading. The file extension is kept.',
+        attachmentPreviewUnavailable:
+          'This file type cannot be previewed. Download it or open it in a new tab.',
+        awaitingTaxInvoiceHint:
+          'Remittance is done, but this case is not closed without a tax invoice. Please upload a tax invoice.',
+        attachmentLockedOnRemittance:
+          'Invoice attachments cannot be changed during remittance for Proforma-approved cases. (Upload remittance proof in Remit)',
+        uploadTaxInvoiceOnly: 'Only a tax invoice can be added to close this case.',
         remittanceProofs: 'Payment proofs',
         notes: 'Notes',
         paymentProcessing: 'Payment processing',
@@ -4490,6 +4603,7 @@ const en = {
         paymentRejectedLine: 'Rejected: {{datetime}} · {{user}}',
         paymentRejectedReason: 'Rejection reason: {{reason}}',
         rejectedComment: 'Rejection comment',
+        revisionRejectComment: 'Reason for correction',
         amountInclTax: 'Incl. tax',
         paidAmount: 'Paid',
         remainingAmount: 'Remaining',
@@ -4497,7 +4611,7 @@ const en = {
           invoiceDate: 'Invoice date',
           description: 'Description',
           qty: 'Qty',
-          unitPrice: 'Unit Price',
+          unitPrice: 'Unit price',
           amount: 'Amount'
         }
       },
@@ -4514,6 +4628,8 @@ const en = {
           assigned: 'Assigned',
           reassigned: 'Changed',
           changed: 'Changed',
+          edited: 'Edited',
+          revisionRejected: 'Rejected for correction',
           approved: 'Accepted',
           rejected: 'Rejected'
         },
@@ -4535,17 +4651,24 @@ const en = {
         pdfDownloading: 'Generating PDF...'
       },
       voucher: {
-        subtitle: 'Payment voucher',
+        subtitle: 'Payment Voucher',
         prepared: 'Prepared',
         approved: 'Approved',
         autoGenerated: 'Auto-generated',
-        departmentRole: 'Department / Role',
+        departmentRole: 'Department / role',
         sectionRequest: 'Expense request',
         sectionBasic: 'Basic information',
         sectionVendor: 'Vendor receiving payment',
         sectionItems: 'Line items',
         sectionTax: 'Tax / total',
         sectionReceipts: 'Receipt attachments',
+        attachmentFileName: 'Attachment file name',
+        attachmentFileNameHint: 'Used when downloading. The file extension is kept.',
+        invoiceTypeHint:
+          'Select tax invoice or proforma invoice before uploading. Proforma allows remittance, but tax invoice is required to close.',
+        invoiceTypeTax: 'Tax invoice',
+        invoiceTypeProforma: 'Proforma invoice',
+        uploadTaxInvoice: 'Upload tax invoice',
         vendorGroupDoc: 'Vendor & voucher',
         vendorGroupPayout: 'Payout account',
         companyLogoAlt: 'Company logo',
@@ -4557,7 +4680,7 @@ const en = {
         labelGstNumber: 'GST number',
         labelVoucherDate: 'Voucher date',
         labelRepresentative: 'Representative',
-        labelPartnerAddress: 'Corporate address',
+        labelPartnerAddress: 'Address',
         labelPartnerPhone: 'Phone',
         labelPartnerEmail: 'Email',
         labelPanNumber: 'PAN number',
@@ -4591,20 +4714,35 @@ const en = {
         receiptUpload: 'Attach files',
         receiptUploading: 'Uploading…',
         receiptClickToView: 'Click to view',
+        receiptDelete: 'Remove attachment',
         refresh: 'Refresh',
         receiptNone: 'No receipts attached.',
         submitSaving: 'Submitting…',
         submit: 'Submit',
+        resubmitAfterRevisionSaving: 'Resubmitting…',
+        resubmitAfterRevision: 'Edit and resubmit',
         create: 'Create',
         qrDialogHint: 'Scan the QR code on your phone and upload receipt photos.',
         qrGenerating: 'Generating QR code…',
         autoSaveSaved: 'Auto-saved',
-        autoSaveFailed: 'Auto-save failed'
+        autoSaveFailed: 'Auto-save failed',
+        partnerLoadFailed: 'Could not load partners. Refresh and try again.',
+        partnerScopeEmpty:
+          'No partners are assigned to you. Ask an admin to assign clients on the work assignee list.',
+        partnerScopeNoMatch: 'No assigned partners match your search.',
+        formTypeLabel: 'Voucher type',
+        formTypeGeneral: 'General',
+        formTypeGst: 'GST',
+        formTypeTds: 'TDS'
       },
       success: {
         draftCreated: 'Draft has been created.',
         submitted: 'Expense report has been submitted.',
         receiptAttached: 'Receipt has been attached.',
+        receiptDeleted: 'Receipt attachment has been removed.',
+        taxInvoiceAttached: 'Tax invoice has been attached.',
+        proformaAttached: 'Proforma invoice has been attached.',
+        remittanceAwaitingTax: 'Remittance recorded. Upload a tax invoice to close this case.',
         deleted: 'Expense report has been deleted successfully.',
         approved: 'Expense report has been approved.',
         rejected: 'Expense report has been rejected.',
@@ -4616,6 +4754,9 @@ const en = {
         paymentRejected: 'Payment request has been rejected.',
         approverChanged: 'Approver has been changed.',
         resubmitted: 'Expense report has been re-requested.',
+        resubmittedAfterRevision: 'Expense report has been edited and resubmitted.',
+        revisionRejected: 'Expense report has been rejected for correction.',
+        edited: 'Expense report has been edited.',
         pdfDownloaded: 'Saved as PDF.',
         printed: 'Expense report printed.'
       },
@@ -4623,6 +4764,8 @@ const en = {
         loadFailed: 'Failed to load expense data.',
         pdfTargetMissing: 'Could not find content to export as PDF.',
         pdfDownloadFailed: 'Failed to save PDF.',
+        attachmentPreviewFailed:
+          'Could not load the preview. Download it or open it in a new tab.',
         createDraftFailed: 'Failed to create expense report draft.',
         requiredTitlePurpose: 'Title and purpose are required.',
         draftNotReadyRetry: 'Draft is not ready yet. Please try again shortly.',
@@ -4630,9 +4773,12 @@ const en = {
         draftNotReady: 'Draft is not ready yet.',
         qrTokenFailed: 'Failed to issue QR token.',
         receiptUploadFailed: 'An error occurred while uploading receipt.',
+        receiptDeleteFailed: 'An error occurred while deleting the receipt.',
+        invoiceTypeRequired: 'Please select tax invoice or proforma invoice.',
         deleteFailed: 'An error occurred while deleting.',
         approveFailed: 'An error occurred while approving.',
         rejectFailed: 'An error occurred while rejecting.',
+        revisionRejectFailed: 'An error occurred while rejecting for correction.',
         paymentRequestFailed: 'An error occurred while requesting payment.',        transferRetryFailed: 'An error occurred while retrying transfer.',
         paymentCompleteFailed: 'An error occurred while completing payment.',
         invalidPaymentAmount: 'Please enter a valid transfer amount.',
@@ -4640,6 +4786,8 @@ const en = {
         paymentExceedsRemaining: 'Transfer amount cannot exceed the remaining balance ({{remaining}}).',
         finalApproveFailed: 'An error occurred during final approval.',
         rejectReasonRequired: 'Please enter a rejection reason.',
+        revisionRejectReasonRequired: 'Please enter a reason for correction.',
+        editReasonRequired: 'Please enter an edit reason.',
         qrGenerateFailed: 'Could not generate the QR code.',
         submitResponseFailed: 'Submit failed.',
         paymentRejectResponseFailed: 'Payment rejection failed.',
@@ -4650,59 +4798,6 @@ const en = {
         receiptOrRemarksRequired: 'Attach a receipt, or enter an explanation in remarks if there is no receipt.',
         resubmitFailed: 'Failed to re-request the expense report.'
       }
-    },
-    hqPortal: {
-      dashboardTitle: 'HQ Integrated Dashboard',
-      dashboardDesc: 'Monitor India entity KPIs, approvals, and compliance from Korea HQ. Click a card to drill down.',
-      refresh: 'Refresh',
-      loadFailed: 'Failed to load dashboard.',
-      finance: 'Finance',
-      purchaseInventory: 'Purchase & Inventory',
-      production: 'Production',
-      sales: 'Sales',
-      compliance: 'Tax & Compliance',
-      pendingApprovals: 'Pending Approvals',
-      approvalsTitle: 'HQ Approvals',
-      approvalsDesc: 'HQ approval queue for high-value PO, BOM changes, period reopen, etc.',
-      docType: 'Doc Type',
-      docNo: 'Doc No',
-      partner: 'Partner',
-      amount: 'Amount',
-      status: 'Status',
-      requestedAt: 'Requested',
-      approve: 'Approve',
-      reject: 'Reject',
-      reportsTitle: 'HQ Reports',
-      reportsDesc: 'Management reports with immutable snapshots for submitted periods.',
-      catalog: 'Catalog',
-      snapshots: 'Snapshots',
-      reportKey: 'Key',
-      reportName: 'Report',
-      period: 'Period',
-      createdAt: 'Created',
-      snapshotSaved: 'Snapshot saved.',
-      complianceTitle: 'Compliance',
-      complianceDesc: 'GSTR/TDS/license due dates and status.',
-      type: 'Type',
-      dueDate: 'Due',
-      fxTitle: 'FX Rates',
-      fxDesc: 'INR/KRW/USD conversion rates with date and source. Posted vouchers are not rewritten.',
-      rateDate: 'Rate Date',
-      rate: 'Rate',
-      source: 'Source',
-      saveRate: 'Save Rate',
-      accessLogsTitle: 'Access Logs',
-      accessLogsDesc: 'HQ view, export, and approval history.',
-      privacyTitle: 'Privacy & Cross-border Settings',
-      privacyDesc: 'Purpose, retention, and legal basis as operational settings — not hard-coded legal conclusions.',
-      purpose: 'Purpose',
-      retentionDays: 'Retention (days)',
-      legalBasis: 'Legal basis',
-      contactEmail: 'Contact email',
-      save: 'Save',
-      saved: 'Saved.',
-      usersTitle: 'HQ Users',
-      usersDesc: 'Assign Korea HQ roles, access levels, and sensitive-data flags.',
     },
     login: {
       welcome: 'Welcome',
@@ -4737,7 +4832,7 @@ const en = {
       brandTagline: 'Integrated ERP for Hyvision India',
       heroCompany: 'HyVISION SYSTEM INDIA PRIVATE LIMITED',
       heroProductName: 'Hyvision One',
-      heroProductLine: 'System Integration · ERP',
+      heroProductLine: 'System Integration',
       heroHeadline: "Leading India's Future of Manufacturing",
       heroSubtext:
         'Delivering high precision vision inspection and automation technology optimized for the Indian manufacturing environment.',
@@ -4810,13 +4905,13 @@ const en = {
       lastUpdated: 'Last updated: {{date}}',
       terms: {
         title: 'Terms of Service',
-        intro: 'These terms govern your use of the Hyvision One cloud ERP service provided by Hyvision India.',
+        intro: 'These terms govern your use of the MVS cloud ERP service provided by Minsub Ventures.',
         lastUpdated: '2025-06-02',
         sections: [
           {
             title: 'Article 1 (Purpose)',
             paragraphs: [
-              'These Terms of Service define the conditions, procedures, and rights and obligations between Hyvision India ("Company") and users of the Hyvision One cloud ERP service ("Service").'
+              'These Terms of Service define the conditions, procedures, and rights and obligations between Minsub Ventures Private Limited ("Company") and users of the MVS cloud ERP service ("Service").'
             ]
           },
           {
@@ -4874,7 +4969,7 @@ const en = {
       },
       privacy: {
         title: 'Privacy Policy',
-        intro: 'Hyvision One values your privacy and processes personal information securely in accordance with applicable laws.',
+        intro: 'MVS values your privacy and processes personal information securely in accordance with applicable laws.',
         lastUpdated: '2025-06-02',
         sections: [
           {
@@ -4921,7 +5016,7 @@ const en = {
           {
             title: '7. Privacy Officer',
             paragraphs: [
-              '· Organization: Hyvision India',
+              '· Organization: Minsub Ventures Private Limited',
               '· Email: info@msventures.in',
               '· Website: www.msventures.in'
             ]
@@ -4930,7 +5025,7 @@ const en = {
       },
       support: {
         title: 'Customer Center',
-        intro: 'If you have questions or need technical support while using Hyvision One, please contact us through the channels below.',
+        intro: 'If you have questions or need technical support while using MVS, please contact us through the channels below.',
         emailLabel: 'Email',
         emailValue: 'info@msventures.in',
         websiteLabel: 'Website',
@@ -5133,6 +5228,18 @@ const en = {
       leaveRejected: 'Leave has been rejected.',
       leaveDeleted: 'Leave request has been deleted.',
       confirmDelete: 'Are you sure you want to delete this leave request?',
+      loadListFailed: 'Unable to load leave list.',
+      loadListError: 'An error occurred while loading leave list.',
+      policySaved: 'Leave policy has been saved.',
+      policySaveFailed: 'Failed to save leave policy.',
+      policySaveError: 'An error occurred while saving leave policy.',
+      leaveApproveFailed: 'Failed to approve leave.',
+      leaveApproveError: 'An error occurred while approving leave.',
+      leaveRejectFailed: 'Failed to reject leave.',
+      leaveRejectError: 'An error occurred while rejecting leave.',
+      leaveDeleteFailed: 'Failed to delete leave request.',
+      leaveDeleteError: 'An error occurred while deleting leave request.',
+      unknownUser: 'Unknown',
       noPermissionCreate: 'You do not have leave menu “Create” permission to apply.',
       noPermissionExport: 'Export requires leave menu “View” or “Edit” permission.',
       noPermissionEditRequest: 'You do not have leave menu “Edit” permission to modify this request.',
@@ -5537,5 +5644,3 @@ const en = {
     }
   }
 };
-
-export default en;

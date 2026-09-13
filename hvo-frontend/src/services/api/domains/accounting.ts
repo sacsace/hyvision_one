@@ -182,10 +182,15 @@ export const accountingService = {
   },
 
   // 지출결?�서 ?�태 변�?
-  updateExpenseReportStatus: async (id: number, status: string, extra?: { reason?: string }) => {
+  updateExpenseReportStatus: async (
+    id: number,
+    status: string,
+    extra?: { reason?: string; reject_kind?: 'final' | 'revision' }
+  ) => {
     const response = await api.put(`/accounting/expenses/${id}/status`, {
       status,
       ...(extra?.reason ? { reason: extra.reason } : {}),
+      ...(extra?.reject_kind ? { reject_kind: extra.reject_kind } : {}),
     });
     return response.data;
   },
@@ -204,23 +209,34 @@ export const accountingService = {
   },
 
   // ?�큰?�로 ?�수�??�로??(?��??�에???�용)
-  uploadExpenseReceipt: async (token: string, file: File) => {
+  uploadExpenseReceipt: async (token: string, file: File, invoiceType: 'tax' | 'proforma' = 'tax') => {
     const formData = new FormData();
     formData.append('token', token);
     formData.append('file', file);
+    formData.append('invoiceType', invoiceType);
     const response = await api.post('/accounting/expenses/upload-receipt', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  // 지출결?�서 ?�수�??�로??(??
-  uploadExpenseReceiptById: async (id: number, files: File[]) => {
+  // 지출결의서 영수증 업로드 (PC)
+  uploadExpenseReceiptById: async (
+    id: number,
+    files: File[],
+    invoiceType: 'tax' | 'proforma'
+  ) => {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
+    formData.append('invoiceType', invoiceType);
     const response = await api.post(`/accounting/expenses/${id}/upload-receipt`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  deleteExpenseReceipt: async (id: number, path: string) => {
+    const response = await api.delete(`/accounting/expenses/${id}/receipt`, { data: { path } });
     return response.data;
   },
 
@@ -580,7 +596,7 @@ export const accountingService = {
     return response.data;
   },
 
-  /** Tally Export → HVO GL (draft vouchers; never auto-posts) */
+  /** Tally Export → MSV GL (draft vouchers; never auto-posts) */
   importTallyExport: async (
     formData: FormData,
     companyId?: number
@@ -603,7 +619,7 @@ export const accountingService = {
     return response.data;
   },
 
-  /** Tally source-to-Hyvision One voucher movement reconciliation */
+  /** Tally source-to-MVS voucher movement reconciliation */
   getTallyImportReconciliation: async (batchId: number, companyId?: number) => {
     const response = await api.get(`/accounting/tally/batches/${batchId}/reconciliation`, {
       params: companyId ? { company_id: companyId } : undefined,
@@ -795,6 +811,7 @@ export const payrollService = {
       /** 기본 gross_6pct(참고 ?�트). epf_12pct_half = ?�전 50%×12% EPF??*/
       pf_mode?: 'gross_6pct' | 'epf_12pct_half';
       pf_cap_1800?: boolean;
+      pf_calc_mode?: 'cap_1800' | 'basic_12pct' | 'total_12pct';
       estimate_tds?: boolean;
     }
   ) => {
@@ -805,40 +822,6 @@ export const payrollService = {
     return response.data;
   },
 
-  /** 급여 명세??PDF(base64)�?직원 ?�메?�로 발송 */
-  sendPayrollPayslip: async (id: number, pdf_base64: string) => {
-    const response = await api.post(`/hr/payrolls/${id}/send-payslip`, { pdf_base64 });
-    return response.data;
-  },
-
-  /** DB 저장 없이 업로드 급여 리스트의 PDF 명세서를 지정 이메일로 발송 (Hyvision One 사용자면 내 명세서에도 보관) */
-  sendImportedPayslip: async (data: {
-    to: string;
-    employee_name: string;
-    payroll_period: string;
-    emp_id?: string;
-    net_salary?: number;
-    subject: string;
-    message: string;
-    pdf_base64: string;
-  }) => {
-    const response = await api.post('/hr/payslips/send-imported', data);
-    return response.data;
-  },
-
-  getMyPayslips: async (params?: { period?: string; q?: string }) => {
-    const response = await api.get('/hr/my/payslips', { params });
-    return response.data;
-  },
-
-  downloadMyPayslip: async (id: number) => {
-    const response = await api.get(`/hr/my/payslips/${id}/download`, {
-      responseType: 'blob',
-    });
-    return response.data as Blob;
-  },
-
-  /** 엑셀 파싱 행 → payrolls 일괄 저장 (이메일·사번 매칭) */
   bulkImportPayrolls: async (data: {
     payroll_period: string;
     replace_matched?: boolean;
@@ -867,6 +850,82 @@ export const payrollService = {
   getMyPayrolls: async (params?: { period?: string }) => {
     const response = await api.get('/hr/my/payrolls', { params });
     return response.data;
+  },
+
+  /** 급여 명세??PDF(base64)�?직원 ?�메?�로 발송 */
+  sendPayrollPayslip: async (id: number, pdf_base64: string) => {
+    const response = await api.post(`/hr/payrolls/${id}/send-payslip`, { pdf_base64 });
+    return response.data;
+  },
+
+  /** DB 저장 없이 업로드 급여 리스트의 PDF 명세서를 지정 이메일로 발송 (MVS 사용자면 내 명세서에도 보관) */
+  sendImportedPayslip: async (data: {
+    to: string;
+    employee_name: string;
+    payroll_period: string;
+    emp_id?: string;
+    net_salary?: number;
+    subject: string;
+    message: string;
+    pdf_base64: string;
+    company_id?: number;
+  }) => {
+    const response = await api.post('/hr/payslips/send-imported', data);
+    return response.data;
+  },
+
+  getMyPayslips: async (params?: { period?: string; q?: string }) => {
+    const response = await api.get('/hr/my/payslips', { params });
+    return response.data;
+  },
+
+  downloadMyPayslip: async (id: number) => {
+    try {
+      const response = await api.get(`/hr/my/payslips/${id}/download`, {
+        responseType: 'blob',
+        headers: { 'x-skip-error-popup': 'true' },
+      });
+      const data = response.data as Blob;
+      if (!data || typeof (data as any).arrayBuffer !== 'function') {
+        throw new Error('명세서 파일을 불러오지 못했습니다.');
+      }
+      const contentType = String(response.headers?.['content-type'] || data.type || '');
+      const buf = await data.arrayBuffer();
+      const bytes = new Uint8Array(buf.slice(0, 5));
+      let head = '';
+      for (let i = 0; i < bytes.length; i += 1) head += String.fromCharCode(bytes[i]);
+      const looksLikePdf = head.startsWith('%PDF');
+      if (
+        !looksLikePdf ||
+        contentType.includes('application/json') ||
+        contentType.includes('text/') ||
+        buf.byteLength < 64
+      ) {
+        let message = '명세서 파일이 없습니다. 급여 관리에서 명세서를 다시 발송해 주세요.';
+        try {
+          const text = new TextDecoder().decode(buf);
+          const parsed = JSON.parse(text);
+          if (parsed?.message) message = String(parsed.message);
+        } catch {
+          /* ignore */
+        }
+        throw new Error(message);
+      }
+      return new Blob([buf], { type: 'application/pdf' });
+    } catch (e: any) {
+      const errData = e?.response?.data;
+      if (errData && typeof errData.arrayBuffer === 'function') {
+        try {
+          const text = await (errData as Blob).text();
+          const parsed = JSON.parse(text);
+          if (parsed?.message) throw new Error(String(parsed.message));
+        } catch (inner: any) {
+          if (inner?.message && !String(inner.message).startsWith('Unexpected')) throw inner;
+        }
+      }
+      if (e?.message) throw e;
+      throw new Error('명세서 파일을 불러오지 못했습니다.');
+    }
   },
 
   // 급여 ?�정

@@ -726,7 +726,7 @@ const Login: React.FC = () => {
               <Box
                 component="img"
                 src="/hyvision-logo.png"
-                alt={t('login.brandName')}
+                alt={t('login.heroProductName')}
                 sx={{
                   height: { xs: 44, sm: 52 },
                   width: 'auto',
@@ -736,18 +736,6 @@ const Login: React.FC = () => {
                 }}
               />
             </Box>
-
-            <Typography
-              sx={{
-                textAlign: 'center',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: 'text.secondary',
-                mb: { xs: 1.5, sm: 2 },
-              }}
-            >
-              {t('login.brandName')}
-            </Typography>
 
             {error && (
               <Alert

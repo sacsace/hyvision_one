@@ -29,6 +29,7 @@ import {
   updateExpenseReportStatus,
   changeExpenseApprover,
   uploadExpenseReceiptById,
+  deleteExpenseReceipt,
   requestExpensePayment,
   rejectExpensePayment,
   approveExpensePayment,
@@ -137,13 +138,19 @@ import { validateBody } from '../middleware/validate';
 const router = Router();
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
-// 영수증 업로드용 multer (인증 없이 토큰으로만 사용)
-const expenseReceiptsPath = ensureUploadSubdir('expense-receipts');
+// 영수증 업로드용 multer (인증 없이 토큰으로만 사용) — destination은 요청 시점에 해석(볼륨 마운트 반영)
 const receiptStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, expenseReceiptsPath),
+  destination: (_req, _file, cb) => {
+    try {
+      cb(null, ensureUploadSubdir('expense-receipts'));
+    } catch (error) {
+      cb(error as Error, '');
+    }
+  },
   filename: (_req, file, cb) => {
-    const safeName = (file.originalname || 'file').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const finalName = `${Date.now()}_${safeName}`;
+    // 임시 고유명으로 저장 후 controller에서 yyyyMMdd_PV (회사) (세부).ext 로 개명
+    const ext = path.extname(file.originalname || '') || '';
+    const finalName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}${ext}`;
     cb(null, finalName);
   }
 });
@@ -157,9 +164,14 @@ const receiptUpload = multer({
   }
 });
 
-const remittanceProofsPath = ensureUploadSubdir('expense-remittance-proofs');
 const remittanceProofStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, remittanceProofsPath),
+  destination: (_req, _file, cb) => {
+    try {
+      cb(null, ensureUploadSubdir('expense-remittance-proofs'));
+    } catch (error) {
+      cb(error as Error, '');
+    }
+  },
   filename: (_req, file, cb) => {
     let original = file.originalname || 'proof';
     try {
@@ -188,9 +200,14 @@ const remittanceProofUpload = multer({
   }
 });
 
-const autoVoucherPath = ensureUploadSubdir('auto-vouchers');
 const autoVoucherStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, autoVoucherPath),
+  destination: (_req, _file, cb) => {
+    try {
+      cb(null, ensureUploadSubdir('auto-vouchers'));
+    } catch (error) {
+      cb(error as Error, '');
+    }
+  },
   filename: (_req, file, cb) => {
     const safeName = (file.originalname || 'document').replace(/[^a-zA-Z0-9.\-_]/g, '_');
     cb(null, `${Date.now()}_${safeName}`);
@@ -334,13 +351,13 @@ router.get('/gl/trial-balance', getTrialBalance);
 router.get('/gl/profit-and-loss', getProfitAndLoss);
 router.get('/gl/balance-sheet', getBalanceSheet);
 
-// Tally Export → HVO Import (XML/JSON, draft vouchers only)
+// Tally Export → MSV Import (XML/JSON, draft vouchers only)
 router.post('/tally/preview', restrictAuditToReadOnly, tallyImportUpload.single('file'), previewTallyImport);
 router.post('/tally/import', restrictAuditToReadOnly, tallyImportUpload.single('file'), runTallyImport);
 router.get('/tally/batches/:id', getTallyImportBatch);
 router.get('/tally/batches/:id/reconciliation', getTallyImportReconciliation);
 
-// SAP Excel / CSV → Hyvision One Draft Voucher (Phase 3: Template 및 읽기 전용 미리보기)
+// SAP Excel / CSV → MVS Draft Voucher (Phase 3: Template 및 읽기 전용 미리보기)
 router.get('/sap/templates', sapImportViewPermission, listSapImportTemplates);
 router.post(
   '/sap/templates',
@@ -608,6 +625,7 @@ router.get('/expenses', getExpenseReports);
 router.get('/expenses/:id', getExpenseReportById);
 router.get('/expenses/:id/receipt-upload-token', getReceiptUploadToken);
 router.post('/expenses/:id/upload-receipt', restrictAuditToReadOnly, receiptUpload.array('files'), uploadExpenseReceiptById);
+router.delete('/expenses/:id/receipt', restrictAuditToReadOnly, deleteExpenseReceipt);
 router.post(
   '/expenses',
   restrictAuditToReadOnly,
